@@ -9,5 +9,5 @@ export default function FirstVisitReveal({ className, children }: { className: s
   // Read only; resolving the flag is `app/Providers.tsx`'s job.
   const isFirstVisit = useGlobalStore((state) => state.isFirstVisit);
 
-  return <div className={isFirstVisit ? `${className} enter-fade-up` : className}>{children}</div>;
+  return <div className={isFirstVisit ? `${className} enter-fade` : className}>{children}</div>;
 }

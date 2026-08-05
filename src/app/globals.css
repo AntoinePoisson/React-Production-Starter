@@ -137,20 +137,24 @@
 }
 
 /* First-visit entrance (see src/components/ui/Overlay.tsx). */
-@keyframes enter-fade-up {
+/* Opacity only, deliberately: this class lands on the overlay wrapper, which carries the copy and
+   the language switcher. The store resolves the first-visit flag in an effect, so the class is
+   added *after* hydration — anything that moved here would move under a pointer already pressed,
+   the mouseup would miss its target, and no click event would be emitted at all. Not the React
+   handler, not even the anchor's own navigation. It cost both mobile E2E projects, where the
+   window is widest; `e2e/i18n.spec.ts` is what caught it. */
+@keyframes enter-fade {
   from {
     opacity: 0;
-    transform: translateY(10px);
   }
 
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
-.enter-fade-up {
-  animation: enter-fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.enter-fade {
+  animation: enter-fade 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Three.js frame loops are JavaScript and unaffected: gate those on the media query directly. */

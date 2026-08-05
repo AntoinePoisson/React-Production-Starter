@@ -89,13 +89,13 @@ describe('Component Smoke Tests', () => {
         useGlobalStore.setState({ isFirstVisit: true });
       });
       const first = render(withI18n(<Overlay />));
-      expect(first.container.firstChild).toHaveClass('enter-fade-up');
+      expect(first.container.firstChild).toHaveClass('enter-fade');
 
       act(() => {
         useGlobalStore.setState({ isFirstVisit: false });
       });
       const returning = render(withI18n(<Overlay />));
-      expect(returning.container.firstChild).not.toHaveClass('enter-fade-up');
+      expect(returning.container.firstChild).not.toHaveClass('enter-fade');
     });
 
     it('should offer a language switcher', () => {
