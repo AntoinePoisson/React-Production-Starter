@@ -43,6 +43,10 @@ jobs:
       # `prepare` script writes them — which never runs on a cache hit. Without this, the first
       # warm cache fails with `Cannot find module './messages/en'`.
       - run: pnpm exec lingui compile
+      # Same reason, different generator: the route tree is git-ignored and written by the
+      # TanStack plugin on dev and build. `import-x/no-unresolved` reads `./routeTree.gen` off
+      # disk, so without this the lint fails on src/router.tsx alone.
+      - run: pnpm run generate-routes
       - name: Run linter
         run: |
           case "${{ github.ref_name }}" in
@@ -149,6 +153,10 @@ jobs:
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
       - if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
+      # `pnpm run test` compiles the catalogues itself, but nothing here writes the route tree —
+      # and Vite has to resolve `./routeTree.gen` to transform src/router.tsx at all. Mocking it
+      # in tests/router.test.ts is not enough: the failure happens before the mock applies.
+      - run: pnpm run generate-routes
       - run: pnpm run test
       - name: Upload coverage
         if: always()
