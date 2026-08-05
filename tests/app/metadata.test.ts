@@ -162,6 +162,10 @@ describe('Content Security Policy', () => {
     expect(CONTENT_SECURITY_POLICY).toContain("base-uri 'self'");
     // Ignored in a meta tag, and logged as an error for every visitor if declared there anyway.
     expect(CONTENT_SECURITY_POLICY).not.toContain('frame-ancestors');
+    // Belongs at the edge, where the origin is already HTTPS. WebKit does not exempt localhost
+    // from the upgrade, so declaring it here breaks every HTTP origin: the E2E run, a preview
+    // box, a phone on the LAN. Chromium and Firefox hide it by exempting local origins.
+    expect(CONTENT_SECURITY_POLICY).not.toContain('upgrade-insecure-requests');
     // `'unsafe-inline'` is a documented compromise; `'unsafe-eval'` is never one.
     expect(CONTENT_SECURITY_POLICY).not.toContain("'unsafe-eval'");
   });

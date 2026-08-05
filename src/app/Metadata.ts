@@ -35,6 +35,13 @@ export const THEME_COLOR = { light: '#c9dcf0', dark: '#0b1220' };
  * pre-rendered ones is worse — a hash disables `'unsafe-inline'`, and hydration then dies.
  * `frame-ancestors` is absent because browsers ignore it in a meta tag. Set a real policy as a
  * response header at your edge; this is the floor.
+ *
+ * `upgrade-insecure-requests` is absent for a different reason: it belongs at the edge, where the
+ * origin is HTTPS and the directive costs nothing. Declared here it also governs every HTTP
+ * origin the build is ever served from — and WebKit, unlike Chromium and Firefox, does not exempt
+ * localhost. Every sub-resource is then requested over https://localhost, fails on TLS, and the
+ * scene never boots: `e2e/app-smoke.spec.ts` caught exactly that, on webkit and mobile-safari
+ * only. Nothing is lost in production, where the app loads no absolute http:// URL.
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -48,8 +55,7 @@ export const CONTENT_SECURITY_POLICY = [
   "media-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
-  'upgrade-insecure-requests'
+  "form-action 'self'"
 ].join('; ');
 
 type Tag = Record<string, string>;
