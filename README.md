@@ -21,7 +21,7 @@ React 19 · Vite 8 · TanStack Start · React Three Fiber — pre-rendered, tran
 [![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![three.js](https://img.shields.io/badge/three.js-0.185-000000?logo=threedotjs&logoColor=white)](https://threejs.org)
 
-<img src="doc/media/demo.gif" alt="The starter running: a 3D scene behind a DOM overlay carrying the title, the copy and the language switcher" width="880">
+<img src="doc/media/scene.gif" alt="The starter running: a 3D knot turning against a lit ground, floating shapes drifting around it, behind a DOM overlay carrying the title, the copy and the language switcher" width="880">
 
 </div>
 
