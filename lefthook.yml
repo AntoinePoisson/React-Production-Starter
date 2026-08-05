@@ -1,0 +1,197 @@
+# Lefthook Git Hooks Configuration
+# See: https://lefthook.dev/configuration/
+
+pre-commit:
+  parallel: true # Run all commands in parallel for speed
+
+  commands:
+    # ================================
+    # 1. Linter (Prettier + ESLint)
+    # ================================
+    # Strict on the shared branches, permissive elsewhere — a feature branch is where a scratch
+    # `console.log` may live; it has to be gone before the code reaches develop.
+    # stage_fixed re-stages only the files the hooks touched — never `git add -A`.
+    linter:
+      glob: '*'
+      stage_fixed: true # CRITICAL: Re-adds only modified staged files
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod|dev|devel|develop)
+            pnpm run lint
+            ;;
+          *)
+            echo "Running permissive linter on branch: $BRANCH"
+            pnpm run lint:permissive
+            ;;
+        esac
+
+    # ================================
+    # 2. TypeScript type checking
+    # ================================
+    # Only checks staged TypeScript files for speed
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: |
+        echo "Running TypeScript type checking on staged files..."
+        pnpm exec tsc-files --noEmit {staged_files}
+
+    # ================================
+    # 3. Translation catalogues
+    # ================================
+    # Re-extracts src/i18n/messages/*.json from the code, so a new <Trans> can never reach a
+    # branch without its catalogue entry. --clean drops the entries a rename left behind.
+    # The translation itself is still yours to fill in; `lingui compile --strict` in `pnpm build`
+    # is what refuses an empty one.
+    #
+    # It reports rather than stages, and that is the whole design. `lingui extract` reads `src/`
+    # from disk, not from the index: stage one file while another in the working tree carries a
+    # new (or deleted) <Trans>, and the catalogue it writes reflects the full working tree. A
+    # `git add` here would then commit entries for code that is not in the commit — or, with
+    # --clean, drop entries for code that still is, leaving `lingui compile --strict` failing on
+    # a tree that looked fine locally. The files are already rewritten on disk when this fails;
+    # review them and stage them yourself.
+    i18n:
+      glob: '*.{ts,tsx}'
+      run: |
+        pnpm exec lingui extract --clean
+        if ! git diff --quiet -- src/i18n/messages; then
+          echo ""
+          echo "❌ Translation catalogues do not match what is staged."
+          echo "   src/i18n/messages/*.json has just been re-extracted from the working tree."
+          echo "   Review the diff, fill in any empty translation, 'git add' it, and commit again."
+          exit 1
+        fi
+        echo "✅ Translation catalogues up to date"
+
+    # ================================
+    # 4. Security audit
+    # ================================
+    # `pnpm run audit`, not `pnpm audit`: the latter is a pnpm built-in that shadows the script,
+    # so it would audit dev dependencies too and ignore the configured level.
+    audit:
+      run: |
+        echo "Running security audit..."
+        pnpm run audit
+
+    # ================================
+    # 5. Check for unused code
+    # ================================
+    # Knip detects unused files, dependencies, and exports
+    knip:
+      run: |
+        echo "Running Knip to check for unused code..."
+        pnpm run knip
+
+    # ================================
+    # 6. Check bundle sizes
+    # ================================
+    # Only runs if dist/ exists (after a build)
+    size-limit:
+      run: |
+        if [ -d "dist" ]; then
+          echo "Checking bundle sizes with size-limit..."
+          pnpm run size
+        else
+          echo "⏭️  Skipping size-limit check (no dist/ folder found)"
+        fi
+
+    # ================================
+    # 7. Git secrets detection
+    # ================================
+    # 40+ patterns: API keys, tokens, passwords, private keys, database URLs, JWT, OAuth…
+    # Severity levels: CRITICAL, HIGH, MEDIUM. Script: scripts/check-secrets.mjs
+    secrets-check:
+      run: node scripts/check-secrets.mjs
+
+    # ================================
+    # 8. FIXME detection (production branches only)
+    # ================================
+    # Scoped to source files, and to ADDED lines only — otherwise *removing* a TODO fails the
+    # commit, and any edit to a doc that legitimately contains the word becomes impossible.
+    fixme-check:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod)
+            echo "🔍 Checking for FIXME/TODO comments on branch: $BRANCH"
+
+            if git diff --cached -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' \
+              | grep -E '^\+' | grep -v '^\+\+\+' | grep -E "(FIXME|TODO|XXX|HACK)" --color=always; then
+              echo ""
+              echo "❌ Found FIXME/TODO/XXX/HACK in added source lines - not allowed on $BRANCH"
+              echo "Please resolve these before committing to a production branch."
+              exit 1
+            fi
+
+            echo "✅ No FIXME/TODO comments found"
+            ;;
+          *)
+            echo "⏭️  Skipping FIXME check (not on main/master/prod branch)"
+            ;;
+        esac
+
+    # ================================
+    # 9. Optimize staged assets (development branches only)
+    # ================================
+    # Rejects the commit if new .original files would be created (they need manual review).
+    optimize-assets:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          dev|devel|develop)
+            echo "Optimizing staged assets on branch: $BRANCH"
+            node scripts/optimize-staged-assets.mjs
+            ;;
+          *)
+            echo "⏭️  Skipping asset optimization (not on a development branch)"
+            ;;
+        esac
+
+# ============================================
+# Pre-push hooks - Long-running tasks
+# ============================================
+pre-push:
+  parallel: true
+
+  commands:
+    # ================================
+    # 1. Tests (production branches only)
+    # ================================
+    tests:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod)
+            echo "🧪 Running full test suite on branch: $BRANCH"
+            pnpm test
+            ;;
+          *)
+            echo "⏭️  Skipping tests (not on main/master/prod branch)"
+            ;;
+        esac
+
+    # ================================
+    # 2. Build (production branches only)
+    # ================================
+    build:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod)
+            echo "🏗️  Running production build on branch: $BRANCH"
+            echo "⚠️  This may take several minutes..."
+            pnpm build
+            ;;
+          *)
+            echo "⏭️  Skipping build (not on main/master/prod branch)"
+            ;;
+        esac
+
+# ============================================
+# Commit message linting (conventional commits)
+# ============================================
+commit-msg:
+  commands:
+    commitlint:
+      run: ./node_modules/.bin/commitlint --edit {1}

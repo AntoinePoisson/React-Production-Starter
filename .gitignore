@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+dist-ssr/
+storybook-static/
+.tanstack/
+.vite/
+
+# testing
+coverage/
+reports/
+blob-report/
+playwright-report/
+test-results/
+
+# generated
+# `lingui compile` writes the .ts catalogues from the .json sources; the TanStack plugin writes
+# the route tree from the src/routes/ file tree. Both run on install, dev and build.
+src/i18n/messages/*.ts
+src/routeTree.gen.ts
+*.tsbuildinfo
+
+# env — only the example is committed
+.env*
+!.env.example
+
+# editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# tooling caches
+.eslintcache
+.claude/

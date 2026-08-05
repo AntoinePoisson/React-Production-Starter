@@ -1,0 +1,17 @@
+{
+  "{percent}% loaded": "{percent}% loaded",
+  "Back to home": "Back to home",
+  "Edit this overlay in <0>src/components/ui/Overlay.tsx</0>": "Edit this overlay in <0>src/components/ui/Overlay.tsx</0>",
+  "Interactive 3D scene — drag to orbit the camera, scroll to zoom": "Interactive 3D scene — drag to orbit the camera, scroll to zoom",
+  "Language": "Language",
+  "Loading…": "Loading…",
+  "Page not found": "Page not found",
+  "React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.": "React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.",
+  "React + Vite + React Three Fiber starter.": "React + Vite + React Three Fiber starter.",
+  "React App Fondation — React + Vite + React Three Fiber starter.": "React App Fondation — React + Vite + React Three Fiber starter.",
+  "Something went wrong": "Something went wrong",
+  "The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.": "The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.",
+  "This experience needs JavaScript enabled to run.": "This experience needs JavaScript enabled to run.",
+  "Try again": "Try again",
+  "Your browser does not support WebGL, so the 3D scene cannot be displayed.": "Your browser does not support WebGL, so the 3D scene cannot be displayed."
+}

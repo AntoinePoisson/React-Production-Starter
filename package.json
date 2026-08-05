@@ -1,0 +1,250 @@
+{
+  "name": "react-app-fondation",
+  "private": true,
+  "version": "0.1.0",
+  "description": "React + Vite + React Three Fiber production starter",
+  "type": "module",
+  "authors": [
+    "Antoine Poisson"
+  ],
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "prepare": "./node_modules/.bin/lingui compile && ./node_modules/.bin/lefthook install",
+    "dev": "reset ; ./node_modules/.bin/lingui compile && ./node_modules/.bin/vite",
+    "dev:scan": "reset ; ./node_modules/.bin/lingui compile && ./node_modules/.bin/vite & ./node_modules/.bin/react-scan localhost:3000",
+    "lint": "./node_modules/.bin/prettier . --check --write && ./node_modules/.bin/eslint --fix --max-warnings 0 .",
+    "lint:permissive": "./node_modules/.bin/prettier . --check --write && ./node_modules/.bin/eslint --fix .",
+    "generate-routes": "./node_modules/.bin/tsr generate",
+    "typecheck": "./node_modules/.bin/tsc --noEmit",
+    "i18n": "./node_modules/.bin/lingui extract --clean && ./node_modules/.bin/lingui compile",
+    "test": "./node_modules/.bin/lingui compile && ./node_modules/.bin/vitest run --coverage",
+    "test:ui": "./node_modules/.bin/vitest --ui --api 3110",
+    "e2e": "./node_modules/.bin/playwright test",
+    "e2e:report": "./node_modules/.bin/playwright show-report reports/html --port 3130",
+    "e2e:install": "./node_modules/.bin/playwright install --with-deps",
+    "build": "./node_modules/.bin/lingui extract --clean && ./node_modules/.bin/lingui compile --strict && ./node_modules/.bin/vite build && node scripts/postbuild.mjs",
+    "analyze": "ANALYZE=true pnpm run build",
+    "website": "./node_modules/.bin/serve ./dist/client --listen 3200 --config ../../serve.json --no-clipboard --no-port-switching",
+    "storybook": "./node_modules/.bin/storybook dev --port 3140 --no-open",
+    "build:storybook": "./node_modules/.bin/storybook build --output-dir storybook-static",
+    "initialize": "node initialize.js",
+    "clean": "rm -rf node_modules/ dist/ dist-ssr/ coverage/ reports/ storybook-static/ tsconfig.tsbuildinfo",
+    "knip": "./node_modules/.bin/knip",
+    "size": "./node_modules/.bin/size-limit",
+    "optimize-assets": "node scripts/optimize-assets.mjs all",
+    "assets:brand": "node scripts/generate-brand-assets.mjs",
+    "audit": "pnpm audit --prod --audit-level=moderate",
+    "audit:fix": "pnpm audit --prod --audit-level=moderate --fix",
+    "check": "./node_modules/.bin/ncu",
+    "check:interactive": "./node_modules/.bin/ncu --interactive --format group",
+    "check:update": "./node_modules/.bin/ncu -u && pnpm install"
+  },
+  "dependencies": {
+    "@lingui/core": "^6.6.0",
+    "@lingui/react": "^6.6.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@react-three/rapier": "^2.2.0",
+    "@tanstack/react-router": "^1.170.18",
+    "@tanstack/react-start": "^1.168.35",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1",
+    "web-vitals": "^6.0.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@dimforge/rapier3d-compat": "0.19.3",
+    "@eslint/js": "^10.0.1",
+    "@gltf-transform/cli": "^4.4.2",
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
+    "@lingui/babel-plugin-lingui-macro": "^6.6.0",
+    "@lingui/cli": "^6.6.0",
+    "@lingui/conf": "^6.6.0",
+    "@lingui/message-utils": "^6.6.0",
+    "@playwright/test": "^1.62.0",
+    "@rolldown/plugin-babel": "^0.2.3",
+    "@size-limit/file": "^13.0.2",
+    "@storybook/addon-a11y": "^10.5.6",
+    "@storybook/react-vite": "^10.5.6",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/router-cli": "^1.167.21",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.1",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/ui": "^4.1.10",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "babel-plugin-react-remove-properties": "^0.3.1",
+    "commitlint": "^21.2.1",
+    "draco3dgltf": "^1.5.7",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "eslint-plugin-security": "^4.0.1",
+    "eslint-plugin-storybook": "^10.5.6",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.8.0",
+    "jsdom": "^30.0.1",
+    "knip": "^6.29.0",
+    "lefthook": "^2.1.10",
+    "npm-check-updates": "^23.0.0",
+    "playwright": "^1.62.0",
+    "postcss": "^8.5.25",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "react-scan": "^0.5.7",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "serve": "^14.2.6",
+    "sharp": "^0.35.3",
+    "size-limit": "^13.0.2",
+    "storybook": "^10.5.6",
+    "tailwindcss": "^4.3.3",
+    "three-stdlib": "^2.36.1",
+    "tsc-files": "^1.1.4",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10",
+    "workbox-build": "^7.4.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "size-limit": [
+    {
+      "name": "Client JS (Total)",
+      "path": "dist/client/static/**/*.js",
+      "limit": "600 KB"
+    },
+    {
+      "name": "Client CSS (Total)",
+      "path": "dist/client/static/**/*.css",
+      "limit": "6 KB"
+    },
+    {
+      "name": "Main HTML (stylesheet inlined)",
+      "path": "dist/client/index.html",
+      "limit": "8 KB"
+    }
+  ],
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-tailwindcss"
+    ],
+    "semi": true,
+    "trailingComma": "none",
+    "singleQuote": true,
+    "jsxSingleQuote": true,
+    "bracketSpacing": true,
+    "bracketSameLine": false,
+    "arrowParens": "always",
+    "singleAttributePerLine": true,
+    "tabWidth": 2,
+    "printWidth": 120
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "type-enum": [
+        2,
+        "always",
+        [
+          "build",
+          "chore",
+          "ci",
+          "docs",
+          "feat",
+          "fix",
+          "merge",
+          "perf",
+          "refactor",
+          "revert",
+          "style",
+          "test"
+        ]
+      ]
+    }
+  },
+  "knip": {
+    "entry": [
+      "src/router.tsx",
+      "src/routes/**/*.tsx",
+      "lingui.config.ts",
+      ".storybook/*.{ts,tsx}",
+      "src/**/*.stories.tsx",
+      "e2e/**/*.spec.ts",
+      "e2e/reporters/**/*.ts",
+      "tests/**/*.{test,spec}.{ts,tsx}",
+      "scripts/**/*.{js,mjs,ts}"
+    ],
+    "project": [
+      "**/*.{ts,tsx,js,jsx,mjs,css}"
+    ],
+    "ignore": [
+      "public/**"
+    ],
+    "includeEntryExports": true,
+    "ignoreDependencies": [
+      "@commitlint/config-conventional",
+      "@gltf-transform/cli",
+      "@react-three/rapier",
+      "@dimforge/rapier3d-compat",
+      "babel-plugin-react-remove-properties"
+    ],
+    "ignoreBinaries": [
+      "reset"
+    ],
+    "playwright": {
+      "entry": [
+        "playwright.config.ts",
+        "e2e/**/*.spec.ts"
+      ]
+    },
+    "vitest": {
+      "entry": [
+        "vitest.config.ts",
+        "vitest.setup.ts",
+        "tests/**/*.{test,spec}.{ts,tsx}"
+      ]
+    },
+    "storybook": {
+      "entry": [
+        ".storybook/{main,preview}.{ts,tsx}",
+        "src/**/*.stories.tsx"
+      ]
+    }
+  },
+  "packageManager": "pnpm@10.30.1"
+}

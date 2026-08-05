@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+
+/* Dark mode resolves against a [data-theme='dark'] attribute, not prefers-color-scheme: a static
+   export has no server to read the OS preference, so a media-only strategy paints light then
+   repaints on hydration. Nothing sets the attribute yet. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* The single source of truth for colour, DOM and 3D scene alike. `@theme static`, not `@theme`:
+   Tailwind v4 prunes theme variables no utility class references, and src/utils/theme/Palette.ts
+   reads several of these at runtime for Three.js materials. Semantic names only. */
+@theme static {
+  --color-ink: #0f172a; /* headings, primary copy */
+  --color-ink-muted: #475569; /* secondary copy */
+  /* Captions and footers. 4.70:1 on the worst background, so it clears WCAG AA for normal-size
+     text while staying visibly lighter than --color-ink-muted. */
+  --color-ink-subtle: #525e6e;
+
+  --color-surface: #f8fafc; /* raised panels, and text on top of --color-ink */
+
+  --color-accent: #6b8cfa;
+
+  /* Separate from --color-accent: a focus indicator owes 3:1 against its surroundings
+     (WCAG 2.2 SC 1.4.11) and the accent measures 2.22:1 on the sky. This clears 7.39:1. */
+  --color-focus: #1e3a8a;
+
+  /* Sky. Painted by the browser behind a transparent canvas, not by a full-screen shader. */
+  --color-sky-top: #c9dcf0;
+  --color-sky-horizon: #e9eef2;
+
+  /* Scene. Consumed only by Palette.ts → Three.js materials, never by a utility class. */
+  --color-scene-floor: #e8e4dd;
+  --color-scene-prop: #f4f1ea;
+}
+
+/* Dark token values. Unlayered so they outrank the `@theme` defaults. */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-ink: #f1f5f9;
+  --color-ink-muted: #cbd5e1;
+  --color-ink-subtle: #94a3b8;
+  --color-surface: #0f172a;
+  --color-accent: #8fa8ff;
+  /* The dark palette clears both thresholds (ink-subtle 5.23:1, accent 5.88:1). */
+  --color-focus: #8fa8ff;
+  --color-sky-top: #0b1220;
+  --color-sky-horizon: #1e293b;
+  --color-scene-floor: #2a2f3a;
+  --color-scene-prop: #3d4453;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :root {
+    /* Without it a dark theme keeps light scrollbars and native controls. */
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    /* Full-screen canvas app: the page must never scroll or rubber-band. Drop for a scrollable site. */
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+
+    color: var(--color-ink);
+    background: linear-gradient(
+      180deg,
+      var(--color-sky-top) 0%,
+      var(--color-sky-horizon) 62%,
+      var(--color-sky-horizon) 100%
+    );
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  /* `user-select` belongs here, not on <body>: the overlay copy above the canvas must stay
+     selectable. OrbitControls' teardown leaves an inline `touch-action: auto` on the canvas that
+     nothing clears, hence the `!important`. Asserted by e2e/responsive.spec.ts. */
+  canvas {
+    touch-action: none !important;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* R3F's container is `outline-none` and the app is chrome-less: without this, no focus ring. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* `viewportFit: 'cover'` (src/utils/config/Metadata.ts) runs the canvas under the notch, so the
+   overlay has to inset itself or the heading lands behind the status bar in landscape. `max()`
+   falls back to the design padding where there is no inset. */
+@utility inset-safe {
+  padding-top: max(var(--overlay-padding), env(safe-area-inset-top));
+  padding-right: max(var(--overlay-padding), env(safe-area-inset-right));
+  padding-bottom: max(var(--overlay-padding), env(safe-area-inset-bottom));
+  padding-left: max(var(--overlay-padding), env(safe-area-inset-left));
+}
+
+@layer base {
+  :root {
+    --overlay-padding: 1.5rem;
+  }
+
+  /* Tailwind's `sm:` boundary, shared with src/utils/screen/Breakpoints.ts. */
+  @media (width >= 40rem) {
+    :root {
+      --overlay-padding: 2.5rem;
+    }
+  }
+}
+
+/* First-visit entrance (see src/components/ui/Overlay.tsx). */
+@keyframes enter-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.enter-fade-up {
+  animation: enter-fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Three.js frame loops are JavaScript and unaffected: gate those on the media query directly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

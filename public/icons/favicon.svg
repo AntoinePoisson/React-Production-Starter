@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="xxtemplatexx">
+  <!-- Placeholder mark. Replace with your own artwork; see the New Project Checklist.
+       Colours mirror --color-accent / --color-ink in app/globals.css. -->
+  <style>
+    .bg { fill: #0f172a }
+    .fg { fill: #6b8cfa }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #f1f5f9 }
+      .fg { fill: #8fa8ff }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="7" />
+  <path class="fg" d="M16 7.5 24.5 22h-17L16 7.5Z" />
+</svg>

@@ -1,0 +1,17 @@
+{
+  "{percent}% loaded": "{percent} % chargés",
+  "Back to home": "Retour à l'accueil",
+  "Edit this overlay in <0>src/components/ui/Overlay.tsx</0>": "Modifiez cette surcouche dans <0>src/components/ui/Overlay.tsx</0>",
+  "Interactive 3D scene — drag to orbit the camera, scroll to zoom": "Scène 3D interactive — glissez pour pivoter la caméra, molette pour zoomer",
+  "Language": "Langue",
+  "Loading…": "Chargement…",
+  "Page not found": "Page introuvable",
+  "React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.": "Starter React + Vite + React Three Fiber — glissez pour pivoter, molette pour zoomer.",
+  "React + Vite + React Three Fiber starter.": "Starter React + Vite + React Three Fiber.",
+  "React App Fondation — React + Vite + React Three Fiber starter.": "React App Fondation — Starter React + Vite + React Three Fiber.",
+  "Something went wrong": "Une erreur s'est produite",
+  "The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.": "La page a rencontré une erreur inattendue. Réessayer suffit généralement ; si cela persiste, rechargez le site.",
+  "This experience needs JavaScript enabled to run.": "Cette expérience nécessite JavaScript pour fonctionner.",
+  "Try again": "Réessayer",
+  "Your browser does not support WebGL, so the 3D scene cannot be displayed.": "Votre navigateur ne prend pas en charge WebGL : la scène 3D ne peut pas s'afficher."
+}
