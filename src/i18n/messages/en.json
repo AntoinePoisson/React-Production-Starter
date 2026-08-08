@@ -1,0 +1,19 @@
+{
+  "{percent}% loaded": "{percent}% loaded",
+  "A production-ready React foundation for fast, accessible and multilingual WebGL experiences.": "A production-ready React foundation for fast, accessible and multilingual WebGL experiences.",
+  "Back to home": "Back to home",
+  "Edit this overlay in <0>src/components/ui/Overlay.tsx</0>": "Edit this overlay in <0>src/components/ui/Overlay.tsx</0>",
+  "Explore the code": "Explore the code",
+  "Interactive 3D scene — drag or press the arrow keys to orbit, scroll or press plus and minus to zoom, Home to reset": "Interactive 3D scene — drag or press the arrow keys to orbit, scroll or press plus and minus to zoom, Home to reset",
+  "Language": "Language",
+  "Loading…": "Loading…",
+  "Page not found": "Page not found",
+  "React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.": "React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.",
+  "React App Fondation — a production-ready React and WebGL starter.": "React App Fondation — a production-ready React and WebGL starter.",
+  "Read the guide": "Read the guide",
+  "Something went wrong": "Something went wrong",
+  "The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.": "The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.",
+  "This experience needs JavaScript enabled to run.": "This experience needs JavaScript enabled to run.",
+  "Try again": "Try again",
+  "Your browser does not support WebGL, so the 3D scene cannot be displayed.": "Your browser does not support WebGL, so the 3D scene cannot be displayed."
+}
