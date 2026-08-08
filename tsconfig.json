@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    /* `noEmit` is on, so `target` only decides which APIs are assumed present. ES2022 is the floor
+       Vite 8 builds for, and `lib` carried both ES2020 and esnext, where esnext simply won. */
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "allowJs": true,
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    /* Linting */
+    "strict": true,
+    "esModuleInterop": true,
+    "incremental": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    /* `@/` is `src/`, not the project root: everything the app imports lives under src/, and a
+       root alias makes `@/src/…` the shape of every import for no gain. */
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "e2e/**/*.ts",
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx",
+    "*.ts",
+    "*.tsx"
+  ],
+  "exclude": ["node_modules", "coverage", "dist", "dist-ssr", "reports", "storybook-static"]
+}
