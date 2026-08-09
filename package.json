@@ -221,7 +221,8 @@
       "@gltf-transform/cli",
       "@react-three/rapier",
       "@dimforge/rapier3d-compat",
-      "babel-plugin-react-remove-properties"
+      "babel-plugin-react-remove-properties",
+      "tsc-files"
     ],
     "ignoreBinaries": [
       "reset"
