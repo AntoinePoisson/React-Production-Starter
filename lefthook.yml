@@ -126,17 +126,25 @@ pre-commit:
         esac
 
 # Long-running, production branches only.
+#
+# Sequential, unlike pre-commit. `vitest run --coverage` takes every core and `vite build` runs
+# its own worker pool, so in parallel they starve each other and whatever else is on the machine.
+# A push that appeared frozen on "waiting: build" was the lingui step of the build getting no CPU
+# while the test run held it all. Sequential is also readable: you see which step you are on.
 pre-push:
-  parallel: true
+  parallel: false
+  piped: true
 
   commands:
-    tests:
+    # Numbered because `piped` runs them in name order and the build must not start until the
+    # tests have released the machine.
+    1_tests:
       run: |
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         case "$BRANCH" in
           main|master|prod)
             echo "🧪 Running full test suite on branch: $BRANCH"
-            sh scripts/with-timeout.sh 900 ./node_modules/.bin/lingui compile \
+            sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui compile \
               && sh scripts/with-timeout.sh 900 ./node_modules/.bin/vitest run --coverage
             ;;
           *)
@@ -144,17 +152,17 @@ pre-push:
             ;;
         esac
 
-    build:
+    2_build:
       run: |
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         case "$BRANCH" in
           main|master|prod)
             echo "🏗️  Running production build on branch: $BRANCH"
-            echo "⚠️  This may take several minutes..."
-            sh scripts/with-timeout.sh 900 ./node_modules/.bin/lingui extract --clean \
-              && sh scripts/with-timeout.sh 900 ./node_modules/.bin/lingui compile --strict \
-              && sh scripts/with-timeout.sh 900 ./node_modules/.bin/vite build \
-              && sh scripts/with-timeout.sh 900 node scripts/postbuild.mjs
+            echo "⚠️  This may take a couple of minutes..."
+            sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui extract --clean \
+              && sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui compile --strict \
+              && sh scripts/with-timeout.sh 600 ./node_modules/.bin/vite build \
+              && sh scripts/with-timeout.sh 120 node scripts/postbuild.mjs
             ;;
           *)
             echo "⏭️  Skipping build (not on main/master/prod branch)"
