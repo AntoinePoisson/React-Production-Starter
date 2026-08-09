@@ -3,13 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import ClientOnly from '@/components/ClientOnly';
 
-/**
- * The replacement for Next's `dynamic(…, { ssr: false })`.
- *
- * Two properties matter, and both are about the pre-render pass rather than the browser: the
- * children must not be *constructed* on the server, and the first client render must match the
- * HTML that was pre-rendered.
- */
+// Two properties matter, both about the prerender pass rather than the browser: the children
+// must not be constructed on the server, and the first client render has to match the HTML.
 describe('ClientOnly', () => {
   it('should render its children once mounted', () => {
     render(<ClientOnly>{() => <p>mounted</p>}</ClientOnly>);
@@ -18,9 +13,9 @@ describe('ClientOnly', () => {
   });
 
   it('should not call the children function during the first render', () => {
-    // The whole point. JSX evaluates its arguments eagerly, so a `<ClientOnly><Canvas /></…>`
-    // would construct the canvas element during the server render — which is the call this
-    // component exists to avoid. Taking a function is what makes that impossible to get wrong.
+    // The whole point. JSX evaluates its arguments eagerly, so <ClientOnly><Canvas /></...>
+    // would construct the canvas during the server render. Taking a function makes that
+    // impossible to get wrong.
     const children = vi.fn(() => <p>scene</p>);
     let callsBeforeEffects = -1;
 

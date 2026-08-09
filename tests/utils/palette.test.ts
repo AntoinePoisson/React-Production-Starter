@@ -1,5 +1,3 @@
-/** Unit tests for the CSS ↔ Three.js colour bridge. */
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { resetPaletteCache, sceneColor } from '@/utils/theme/Palette';

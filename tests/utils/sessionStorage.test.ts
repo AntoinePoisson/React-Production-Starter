@@ -1,5 +1,3 @@
-/** Unit tests for the first-visit flag and its timestamp-based expiration. */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isFirstVisit, markAsVisited, resetVisitFlag } from '@/utils/store/SessionStorage';

@@ -20,11 +20,6 @@ const Harness = () => {
   return null;
 };
 
-/**
- * The one-time client wiring. It is an effect and not a provider because a pre-rendered build
- * has no server/client component split to straddle — an effect simply does not run during the
- * pre-render pass.
- */
 describe('useBoot', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,7 +38,7 @@ describe('useBoot', () => {
   it('should expose the log controls and start reporting vitals', () => {
     render(<Harness />);
 
-    // Without `exposeLogControls`, `?log=debug` and `window.__log` are tree-shaken out of the
+    // Without exposeLogControls, ?log=debug and window.__log get tree-shaken out of the
     // production bundle and neither works on a deployed page.
     expect(exposeLogControls).toHaveBeenCalled();
     expect(startVitalsReporting).toHaveBeenCalled();
@@ -55,7 +50,7 @@ describe('useBoot', () => {
     render(<Harness />);
 
     // Patching it attributes every line to ConsoleBridge.ts instead of the file it was written
-    // in, which costs devtools' click-to-source — the entire point of `console.log`.
+    // in, which costs devtools click-to-source.
     expect(installConsoleBridge).not.toHaveBeenCalled();
     expect(printBanner).not.toHaveBeenCalled();
   });
@@ -68,9 +63,8 @@ describe('useBoot', () => {
     expect(printBanner).toHaveBeenCalled();
     expect(installConsoleBridge).toHaveBeenCalled();
 
-    // Ordering is load-bearing: `printBanner` is a raw `console.info` kept outside the pipeline
-    // on purpose, and once the console is patched that call becomes `log.info` — which the
-    // production threshold of `warn` drops. The signature would then print for nobody.
+    // The ordering matters. printBanner is a raw console.info kept outside the pipeline, and a
+    // patched console turns it into log.info, which the production threshold of `warn` drops.
     expect(printBanner.mock.invocationCallOrder[0]).toBeLessThan(installConsoleBridge.mock.invocationCallOrder[0]);
   });
 

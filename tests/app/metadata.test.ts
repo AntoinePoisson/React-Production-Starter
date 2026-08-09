@@ -4,14 +4,11 @@ import { CONTENT_SECURITY_POLICY, THEME_COLOR, rootHead } from '@/app/Metadata';
 import { LOCALES, localePath } from '@/i18n/Routing';
 
 /**
- * The `<head>` of every pre-rendered page.
- *
- * Asserted as data rather than as rendered HTML, which is the reason `rootHead` and `localeHead`
- * are plain functions: a crawler reads these tags and never runs a click, so what matters is the
- * exact set of tags produced for a locale — not how React chose to serialise them.
+ * Asserted as data rather than as rendered HTML, which is why rootHead and localeHead are plain
+ * functions. What matters is the exact set of tags for a locale, not how React serialised them.
  */
 
-/** Fresh module graph per case: the origin is read once, at import time. */
+/** Fresh module graph per case, the origin is read once at import time. */
 const loadMetadata = async (env: Record<string, string> = {}) => {
   vi.resetModules();
 
@@ -26,31 +23,30 @@ describe('rootHead', () => {
   });
 
   it('should declare the encoding before anything else', () => {
-    // The CSP is meta-delivered, and a meta policy only governs what follows it — while the
-    // encoding declaration must land in the document's first 1024 bytes. Second in line, not
-    // first, is the only position that satisfies both.
+    // A meta policy only governs what follows it, and the encoding declaration has to land in
+    // the first 1024 bytes. Second in line is the only position that satisfies both.
     const { meta } = rootHead();
 
     expect(meta[0]).toEqual({ charSet: 'utf-8' });
-    // `httpEquiv`, not `http-equiv`: these go through React, which drops the HTML spelling.
+    // httpEquiv and not http-equiv, these go through React which drops the HTML spelling.
     expect(meta[1].httpEquiv).toBe('Content-Security-Policy');
   });
 
   it('should allow pinch-zoom', () => {
     const viewport = rootHead().meta.find((tag) => tag.name === 'viewport');
 
-    // Blocking it fails WCAG 1.4.4. Double-tap zoom is stopped with `touch-action` on the
-    // canvas instead, which costs nobody their ability to read.
+    // Blocking it fails WCAG 1.4.4. Double-tap zoom is stopped with touch-action on the canvas
+    // instead, which costs nobody their ability to read.
     expect(viewport?.content).not.toContain('user-scalable=no');
     expect(viewport?.content).not.toContain('maximum-scale');
     expect(viewport?.content).toContain('viewport-fit=cover');
   });
 
   it('should never declare the same meta name twice', () => {
-    // The head deduplicates by `name` and keeps the last one, so a duplicate is not two tags —
-    // it is one tag silently replacing another, in the built HTML only. This shipped once as a
-    // light/dark `theme-color` pair: `media` is not part of the dedup key, the light tag was
-    // dropped, and every visitor on a dark OS got dark browser chrome around a light page.
+    // The head dedupes by `name` and keeps the last one, so a duplicate isn't two tags, it's one
+    // tag silently replacing another, in the built HTML only. This shipped once as a light/dark
+    // theme-color pair: `media` isn't part of the dedup key, so the light tag was dropped and
+    // every visitor on a dark OS got dark browser chrome around a light page.
     const names = rootHead()
       .meta.map((tag) => tag.name)
       .filter(Boolean);
@@ -61,9 +57,8 @@ describe('rootHead', () => {
   it('should declare one unconditional theme colour', () => {
     const themeColors = rootHead().meta.filter((tag) => tag.name === 'theme-color');
 
-    // The page has no dark mode to match — `[data-theme='dark']` is never set — so a scheme-aware
-    // pair would tint the chrome for a state the document never enters. Emit it from postbuild,
-    // not from here, on the day that changes.
+    // Nothing sets [data-theme='dark'], so a scheme-aware pair would tint the chrome for a state
+    // the document never enters. Emit it from postbuild the day that changes.
     expect(themeColors).toHaveLength(1);
     expect(themeColors[0].media).toBeUndefined();
     expect(themeColors[0].content).toBe(THEME_COLOR.light);
@@ -95,7 +90,7 @@ describe('localeHead', () => {
     const { localeHead } = await loadMetadata({ VITE_SITE_URL: 'https://example.com' });
     const alternates = localeHead('en').links.filter((link) => link.rel === 'alternate');
 
-    // Without these the locales read as duplicate content rather than translations.
+    // Without these the locales read as duplicate content instead of translations.
     expect(alternates.map((link) => link.hrefLang)).toEqual(['en-US', 'fr-FR', 'x-default']);
   });
 
@@ -136,8 +131,8 @@ describe('localeHead', () => {
   });
 
   it.each(['https://example.com', ''])('should declare the page indexable with origin %j', async (origin) => {
-    // One behaviour, always. A build that decides for itself ships `noindex` to production the
-    // day a CI variable goes missing; keeping a preprod out of the index is the host's job.
+    // One behaviour, always. A build that decides for itself ships noindex to production the day
+    // a CI variable goes missing. Keeping a preprod out of the index is the host's job.
     const { localeHead } = await loadMetadata({ VITE_SITE_URL: origin });
     const robots = localeHead('en').meta.find((tag) => tag.name === 'robots');
 
@@ -148,7 +143,7 @@ describe('localeHead', () => {
     const { localeHead } = await loadMetadata({ VITE_SITE_URL: 'https://example.com' });
     const twitterSite = localeHead('en').meta.find((tag) => tag.name === 'twitter:site');
 
-    // Pointing the card at a handle you do not own hands your social preview to a stranger.
+    // Pointing the card at a handle you don't own hands your social preview to a stranger.
     expect(twitterSite).toBeUndefined();
   });
 });
@@ -162,11 +157,11 @@ describe('Content Security Policy', () => {
     expect(CONTENT_SECURITY_POLICY).toContain("base-uri 'self'");
     // Ignored in a meta tag, and logged as an error for every visitor if declared there anyway.
     expect(CONTENT_SECURITY_POLICY).not.toContain('frame-ancestors');
-    // Belongs at the edge, where the origin is already HTTPS. WebKit does not exempt localhost
+    // Belongs at the edge, where the origin is already HTTPS. WebKit doesn't exempt localhost
     // from the upgrade, so declaring it here breaks every HTTP origin: the E2E run, a preview
-    // box, a phone on the LAN. Chromium and Firefox hide it by exempting local origins.
+    // box, a phone on the LAN. Chromium and Firefox hide the problem by exempting local origins.
     expect(CONTENT_SECURITY_POLICY).not.toContain('upgrade-insecure-requests');
-    // `'unsafe-inline'` is a documented compromise; `'unsafe-eval'` is never one.
+    // 'unsafe-inline' is a documented compromise, 'unsafe-eval' is never one.
     expect(CONTENT_SECURITY_POLICY).not.toContain("'unsafe-eval'");
   });
 });

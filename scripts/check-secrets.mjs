@@ -1,18 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Git Secrets Detection Script
  * Scans for secrets, API keys, tokens and other credential shapes.
  *
- * Two modes: the staged diff by default, which is what the pre-commit hook wants, and
- * every tracked file with `--all`, which is what CI needs — after `actions/checkout` the
- * index equals HEAD, so the default mode inspects nothing at all there.
+ * Staged diff by default (the pre-commit hook), every tracked file with --all (CI, where the
+ * index equals HEAD after checkout so the default mode would inspect nothing).
  *
- * Exit policy: CRITICAL and HIGH block the commit, MEDIUM is reported only. MEDIUM
- * patterns are heuristics (entropy, shapes that merely resemble a key) and blocking on
- * them teaches everyone to reach for `--no-verify`, which costs more than it saves.
- *
- * Escape hatch: append `secrets-check:ignore` to a line to exempt it.
+ * CRITICAL and HIGH block the commit, MEDIUM is reported only. Append `secrets-check:ignore` to
+ * a line to exempt it.
  */
 
 import { execFileSync } from 'child_process';
@@ -24,7 +19,6 @@ const INLINE_IGNORE = 'secrets-check:ignore';
 /** Severities that fail the run. */
 const BLOCKING_SEVERITIES = new Set(['CRITICAL', 'HIGH']);
 
-// ANSI colors for terminal output
 const colors = {
   red: '\x1b[31m',
   green: '\x1b[32m',
@@ -34,40 +28,29 @@ const colors = {
   bold: '\x1b[1m'
 };
 
-// Files and paths to skip (legitimate uses of secret-like patterns)
-//
-// `.github/workflows` is deliberately NOT here any more. It was, and it made the whole
-// exercise circular: those files are the only tracked place that names `CLOUDFLARE_API_TOKEN`
-// (`.env` is gitignored), so the HIGH `Generic Token` pattern — which carries a comment
-// explaining it was fixed specifically to catch that name — could never run against the one
-// file it was fixed for. A token pasted in place of `${{ secrets.… }}` to unblock a deploy
-// passed both the pre-commit hook and the `Secrets Detection` job, itself a `needs:` of all
-// three deployments. `${{ secrets.X }}` does not false-positive: `$` and `{` fall outside the
-// `[a-zA-Z0-9_\-]` character class every value pattern uses.
+// Files to skip. Note that .github/workflows is NOT in here: those files are the only tracked
+// place that names a CI token, so skipping them would make the Generic Token pattern useless.
+// ${{ secrets.X }} doesn't false-positive, $ and { are outside the character class the value
+// patterns use.
 const SKIP_PATTERNS = [
   /pnpm-lock\.yaml$/,
   /package-lock\.json$/,
   /yarn\.lock$/,
   /\.lock$/,
-  /scripts\/check-secrets\.mjs$/, // This file contains secret patterns as examples
+  /scripts\/check-secrets\.mjs$/, // this file holds the patterns themselves
   /node_modules/,
   /\.git\//,
-  // Vendored, minified third-party code. The Draco decoder alone trips the MEDIUM entropy
-  // heuristic 16 times on every run, and a wall of constant false positives is the one way
-  // a non-blocking scanner fails: the real MEDIUM, when it comes, scrolls past unread.
+  // Vendored minified code. The Draco decoder alone trips the entropy heuristic 16 times per
+  // run, and a wall of false positives is how a non-blocking scanner ends up ignored.
   /(^|\/)public\/assets\/models\/draco\//,
-  // Anchored to a path segment. Unanchored, `/out\//` also matched `src/components/
-  // layout/`, `/build\//` matched `src/rebuild/`, and `/out\//` matched `src/checkout/` —
-  // so a secret pasted into a `layout/` directory, which every Next project grows within
-  // a fortnight, was skipped in silence.
+  // Anchored to a path segment. Unanchored, /out\// also matched src/checkout/ and /build\//
+  // matched src/rebuild/, so a secret in one of those was skipped silently.
   /(^|\/)dist\//,
   /(^|\/)build\//,
   /(^|\/)out\//,
   /(^|\/)coverage\//
 ];
 
-// Comprehensive secret patterns
-// Each pattern has: regex, name, and severity
 const SECRET_PATTERNS = [
   // Generic API Keys & Secrets
   {
@@ -82,10 +65,9 @@ const SECRET_PATTERNS = [
   },
   {
     name: 'Generic Token',
-    // No leading `\b`, and `api` in the alternation: an underscore is a word character,
-    // so `\bapi` cannot match the `API` in `CLOUDFLARE_API_TOKEN` — the most damaging
-    // credential this project holds. It used to reach only the MEDIUM entropy
-    // heuristic, which does not block a commit.
+    // No leading \b, and `api` in the alternation. An underscore is a word character, so \bapi
+    // can't match the API in CLOUDFLARE_API_TOKEN, which only ever reached the MEDIUM entropy
+    // heuristic and therefore never blocked a commit.
     pattern: /(access|auth|api|bearer|refresh|session)[_-]?token\s*[:=]\s*['"]?([a-zA-Z0-9_\-\.]{20,})['"]?/i,
     severity: 'HIGH'
   },
@@ -238,9 +220,8 @@ const SECRET_PATTERNS = [
     severity: 'HIGH'
   },
 
-  // Heroku
-  // Requires the key name next to it on purpose: the previous version was a bare UUID
-  // regex, so every uuid() in the codebase tripped it and blocked the commit.
+  // Heroku. Needs the key name next to it: a bare UUID regex tripped on every uuid() in the
+  // codebase and blocked the commit.
   {
     name: 'Heroku API Key',
     pattern:
@@ -295,18 +276,11 @@ const SECRET_PATTERNS = [
     name: 'High Entropy String',
     pattern: /['"][a-zA-Z0-9_\-]{40,}['"]/,
     severity: 'MEDIUM',
-    validate: (match) => {
-      // Calculate entropy to reduce false positives
-      const entropy = calculateEntropy(match);
-      return entropy > 4.5; // High entropy threshold
-    }
+    validate: (match) => calculateEntropy(match) > 4.5
   }
 ];
 
-/**
- * Calculate Shannon entropy of a string
- * Higher entropy = more random/complex = likely a secret
- */
+/** Shannon entropy. Higher = more random = more likely a real secret. */
 function calculateEntropy(str) {
   const len = str.length;
   const frequencies = {};
@@ -321,16 +295,10 @@ function calculateEntropy(str) {
   }, 0);
 }
 
-/**
- * Check if file should be skipped
- */
 function shouldSkipFile(filePath) {
   return SKIP_PATTERNS.some((pattern) => pattern.test(filePath));
 }
 
-/**
- * Get list of staged files
- */
 function getStagedFiles() {
   try {
     const output = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'], {
@@ -346,12 +314,7 @@ function getStagedFiles() {
   }
 }
 
-/**
- * Every file git tracks — the input for `--all`.
- *
- * `-z` because a filename may legitimately contain a newline, which would otherwise
- * split one path into two unscannable ones.
- */
+/** Input for --all. -z because a filename can legitimately contain a newline. */
 function getTrackedFiles() {
   try {
     const output = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf-8' });
@@ -362,9 +325,6 @@ function getTrackedFiles() {
   }
 }
 
-/**
- * Get diff content for a file
- */
 function getFileDiff(filePath) {
   try {
     return execFileSync('git', ['diff', '--cached', '--', filePath], {
@@ -376,12 +336,9 @@ function getFileDiff(filePath) {
 }
 
 /**
- * A whole file, read as-is.
- *
- * It used to be reshaped into a diff of pure additions — one `+` per line — so that
- * `scanFile` had a single input format. That silently dropped every source line starting
- * with `++`: prefixed, `++counter;` becomes `+++counter;`, which the added-lines filter
- * discards as a diff header. `scanFile` takes the mode instead.
+ * As-is, no diff prefixes. Reshaping it into a fake diff of pure additions dropped every source
+ * line starting with ++ (prefixed, `++counter;` becomes `+++counter;`, which the added-lines
+ * filter throws away as a header). scanFile takes the mode instead.
  */
 function getFileContent(filePath) {
   try {
@@ -392,12 +349,9 @@ function getFileContent(filePath) {
 }
 
 /**
- * Add the global flag while preserving the ones the pattern already declares.
- *
- * `new RegExp(pattern, 'g')` REPLACES the flag set instead of extending it, so it
- * silently stripped `/i` from the ten case-insensitive patterns above. The effect was
- * that `API_KEY=`, `PASSWORD=`, `CLIENT_SECRET=` and friends in upper case — the single
- * most common shape of a real leak — went undetected.
+ * Adds /g while keeping the flags the pattern already declares. new RegExp(pattern, 'g')
+ * REPLACES the flag set instead of extending it, which silently stripped /i from the ten
+ * case-insensitive patterns above, so `API_KEY=` in upper case went undetected.
  */
 function withGlobalFlag(pattern) {
   const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
@@ -407,14 +361,13 @@ function withGlobalFlag(pattern) {
 /**
  * @param filePath path reported in the findings
  * @param source   a `git diff` in staged mode, the raw file in `--all` mode
- * @param isDiff   whether `source` is a diff — only then is there anything to filter
+ * @param isDiff   whether `source` is a diff. Only then is there anything to filter
  */
 function scanFile(filePath, source, { isDiff } = { isDiff: true }) {
   const findings = [];
 
-  // In diff mode, only added lines are interesting: `+++ b/path` is the header, not a
-  // change. Whole files carry no such markers, so filtering them would drop real code.
-  // The inline escape hatch applies in both modes.
+  // In diff mode only added lines matter, and `+++ b/path` is a header rather than a change.
+  // Whole files carry no such markers, so filtering them there would drop real code.
   const scannedLines = source
     .split('\n')
     .filter((line) => !isDiff || (line.startsWith('+') && !line.startsWith('+++ ')))
@@ -445,23 +398,12 @@ function scanFile(filePath, source, { isDiff } = { isDiff: true }) {
   return findings;
 }
 
-/**
- * Main function
- */
 function main() {
-  /**
-   * Two modes, because the default one is useless in CI.
-   *
-   * Staged mode reads `git diff --cached`. After `actions/checkout` the index equals
-   * HEAD, so that list is empty and the job printed "no staged files" and exited 0 —
-   * a named gate, a dependency of every deploy, that had never inspected a byte. It is
-   * still the right mode for the pre-commit hook, where reviewing only what you are
-   * about to add is the point.
-   *
-   * `--all` scans every tracked file instead. Use it in CI. Deliberately not
-   * `--range base..HEAD`: that is empty on push events, which would reintroduce exactly
-   * the silent pass being fixed here, and it needs a non-shallow clone.
-   */
+  // Staged mode reads `git diff --cached`, which is right for the pre-commit hook and useless in
+  // CI: after actions/checkout that list is empty, so the job printed "no staged files" and
+  // exited 0 while being a needs: of all three deploys. Use --all there.
+  //
+  // Not --range base..HEAD, which is empty on push events and needs a non-shallow clone.
   const scanAll = process.argv.includes('--all');
   console.info(
     `${colors.cyan}🔐 Checking for secrets/tokens in ${scanAll ? 'all tracked files' : 'staged files'}...${colors.reset}\n`
@@ -471,9 +413,8 @@ function main() {
 
   if (files.length === 0) {
     if (scanAll) {
-      // Nothing tracked means `git ls-files` failed, not that the repository is clean.
-      // Passing here would be the same silent-success bug in a new costume.
-      console.error(`${colors.red}❌ --all found no tracked files — is this a git repository?${colors.reset}`);
+      // Nothing tracked means git ls-files failed, not that the repo is clean.
+      console.error(`${colors.red}❌ --all found no tracked files - is this a git repository?${colors.reset}`);
       process.exit(1);
     }
     console.info(`${colors.green}✅ No staged files to check${colors.reset}`);
@@ -498,7 +439,6 @@ function main() {
     allFindings = allFindings.concat(findings);
   }
 
-  // Group findings by severity
   const critical = allFindings.filter((f) => f.severity === 'CRITICAL');
   const high = allFindings.filter((f) => f.severity === 'HIGH');
   const medium = allFindings.filter((f) => f.severity === 'MEDIUM');
@@ -539,7 +479,7 @@ function main() {
 
     if (blocking.length === 0) {
       console.info(
-        `${colors.cyan}Only MEDIUM heuristics matched — not blocking the commit.${colors.reset}\n` +
+        `${colors.cyan}Only MEDIUM heuristics matched, not blocking the commit.${colors.reset}\n` +
           `${colors.cyan}Review them anyway; append \`${INLINE_IGNORE}\` to a line to silence it.${colors.reset}\n`
       );
       process.exit(0);

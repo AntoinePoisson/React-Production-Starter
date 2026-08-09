@@ -1,7 +1,5 @@
-/**
- * `import.meta.env.MODE` rather than `PROD`/`DEV`: Vite replaces both statically, but `MODE`
- * keeps a third value (`test`) that Vitest sets, and it is the one `vi.stubEnv` can move.
- */
+// MODE rather than PROD/DEV. Vite replaces all three statically, but MODE keeps the third value
+// Vitest sets ('test') and it's the one vi.stubEnv can move.
 
 export const isProduction = (): boolean => {
   return import.meta.env.MODE === 'production';

@@ -1,11 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright E2E configuration.
- *
- * Five projects: three desktop browsers and two mobile viewports. Core Web Vitals come from the
- * `pageWithVitals` fixture. Screenshot comparison is wired up below but no spec uses it yet — the
- * baselines directory stays empty until one does.
+ * Five projects: three desktop browsers plus two mobile viewports. Web Vitals come from the
+ * pageWithVitals fixture. Screenshot comparison is wired up but no spec uses it yet.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -13,19 +10,18 @@ export default defineConfig({
   snapshotDir: './reports/baseline-snapshots',
   snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{-projectName}{-snapshotSuffix}{ext}',
 
-  // 120 s is not a round number picked for comfort: the longest test in the suite gives the scene
-  // 30 s to boot and then polls three viewport changes at 20 s each (`RESIZE_SETTLE_TIMEOUT` in
-  // e2e/responsive.spec.ts).
+  // 120s comes from the longest test: 30s for the scene to boot, then three viewport changes at
+  // 20s each (RESIZE_SETTLE_TIMEOUT in e2e/responsive.spec.ts). Raise one, check the other.
   timeout: process.env.CI ? 120 * 1000 : 60 * 1000,
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
 
-  // CI: 2 workers. A GitHub runner has no GPU, so every page renders a live three.js scene through
-  // SwiftShader on the CPU, and `autoRotate` means it never stops. Four such pages starve the main
-  // thread, and Playwright reports starvation as `locator.evaluate` / `boundingBox` / `click`
-  // timeouts — which read like broken selectors. Suspect this before suspecting the selector.
+  // 2 on CI, not 4. A runner has no GPU, so every page draws its scene through SwiftShader on the
+  // CPU and autoRotate means it never stops. Four of those starve the main thread, and Playwright
+  // reports starvation as evaluate/boundingBox/click timeouts, which read like broken selectors.
+  // If a spec is slow on CI and instant locally, suspect this first.
   workers: process.env.CI ? 2 : '50%',
 
   reporter: (() => {
@@ -45,7 +41,7 @@ export default defineConfig({
     video: process.env.CI ? 'retain-on-failure' : 'off',
     viewport: { width: 1920, height: 1080 },
     navigationTimeout: 30 * 1000,
-    // Doubled on CI for the same software-rendering reason as `workers` above.
+    // Doubled on CI for the same software-rendering reason as the workers above.
     actionTimeout: process.env.CI ? 20 * 1000 : 10 * 1000
   },
 
@@ -78,9 +74,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    // CI serves the real build, so the specs measure what ships. Locally the dev server keeps the
-    // loop fast. `dist/client` and not `dist`: the build also emits a `dist/server` that a static
-    // site never deploys.
+    // CI serves the real build so the specs measure what ships, locally the dev server keeps the
+    // loop fast. dist/client and not dist, the build also emits a dist/server nobody deploys.
     command: process.env.CI
       ? './node_modules/.bin/serve ./dist/client --listen 3120 --config ../../serve.json --no-clipboard --no-request-logging --no-port-switching'
       : 'lsof -ti :3120 | xargs kill -9 2>/dev/null || true && ./node_modules/.bin/lingui compile && ./node_modules/.bin/vite dev --port 3120',

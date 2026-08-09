@@ -1,5 +1,3 @@
-/** Unit tests for the environment detection helpers. */
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getEnvironment, isDevelopment, isProduction } from '@/utils/config/Env';

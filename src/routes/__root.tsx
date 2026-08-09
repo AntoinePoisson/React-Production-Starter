@@ -15,16 +15,15 @@ import { getI18n } from '@/i18n/I18n';
 import { LOCALE_TAGS } from '@/i18n/Routing';
 import { localeFromPath } from '@/i18n/useLocaleSwitch';
 
-// Kept out of the first load: three.js, drei and the scene are ~220 kB brotli. `lazy` only holds
-// that line if nothing *else* in this file reaches into the same graph — a static import of a
-// component that merely calls drei's `useProgress` is enough to put the whole of three.js back on
-// the critical path, `modulepreload`ed ahead of first paint. Hence `BootLoader`, which is DOM only.
+// three.js + drei + the scene are ~220 kB, kept out of the first load. lazy() only holds that
+// line as long as nothing else in this file reaches into the same graph, so watch the static
+// imports above: one of them calling drei's useProgress is enough to undo all of it.
 const ThreeCanvas = lazy(() => import('@/components/three/Canvas'));
 const Experiences = lazy(() => import('@/scene/Experiences'));
 
 /**
- * The document shell. There is no `index.html` — TanStack Start renders `<html>` itself, which
- * is what lets `<html lang>` differ per locale.
+ * The document shell. There is no index.html, TanStack Start renders <html> itself, which is what
+ * lets <html lang> differ per locale.
  */
 export const Route = createRootRoute({
   head: () => {
@@ -38,7 +37,6 @@ export const Route = createRootRoute({
   pendingComponent: Loading
 });
 
-/** Its own component because `useLingui` reads the context from above its caller. */
 function NoScriptNotice() {
   const { t } = useLingui();
 
@@ -53,8 +51,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const locale = localeFromPath(pathname);
 
-  // For identity, not speed: `useLocaleSwitch` calls `activate()` on the mounted instance, and a
-  // fresh one on every render would discard that call.
+  // For identity, not speed. useLocaleSwitch calls activate() on the mounted instance and a fresh
+  // one on every render would throw that call away.
   const i18n = useMemo(() => getI18n(locale), [locale]);
 
   useBoot();
@@ -68,9 +66,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <I18nProvider i18n={i18n}>
           <NoScriptNotice />
 
-          {/* In the shell, not in the page: `/` and `/fr` are different routes, so a scene
-              mounted in either is destroyed on every language switch. Suspense is required —
-              `lazy` suspends, and an unbounded suspension takes the tree down. */}
+          {/* Mounted here and not in the page. / and /fr are different routes, so a scene
+              mounted in either gets destroyed on every language switch. The Suspense is
+              mandatory, lazy() suspends and an unbounded suspension takes the tree down. */}
           <ClientOnly fallback={<BootLoader />}>
             {() => (
               <Suspense fallback={<BootLoader />}>

@@ -6,10 +6,7 @@ import { createLogger } from '@/utils/logger/Logger';
 
 const log = createLogger('error-boundary');
 
-/**
- * Recoverable route error. `router.invalidate()` re-runs the failed match rather than reloading
- * the document, which would cost the WebGL context.
- */
+// router.invalidate() re-runs the failed match. A document reload would kill the WebGL context.
 export default function ErrorPage({ error }: { error: Error }) {
   const { t } = useLingui();
   const router = useRouter();

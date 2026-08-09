@@ -5,16 +5,15 @@ import path from 'path';
 import type { Page } from '@playwright/test';
 
 /**
- * Local web-vitals IIFE bundle, injected via `addInitScript`: no CDN, no CSP exception.
- * Plain build, not `attribution` (~4x the size, and its extra observers run on the main thread
- * of the page the benchmark job measures). The package's `exports` map forbids deep paths, so
- * resolve the public entry and swap the build variant.
+ * Local web-vitals IIFE bundle, so no CDN and no CSP exception. The plain build, not
+ * `attribution`: ~4x the size and its extra observers run on the thread we're measuring.
+ * The exports map forbids deep paths, hence resolving the entry and swapping the variant.
  */
 const requireFromRoot = createRequire(path.join(process.cwd(), 'package.json'));
 const WEB_VITALS_BUNDLE_PATH = requireFromRoot.resolve('web-vitals').replace(/\.umd\.cjs$|\.js$/, '.iife.js');
 
 // Playwright evaluates injected scripts inside a function scope, so the bundle's top-level
-// `var webVitals` never reaches `window` on its own.
+// `var webVitals` never reaches window on its own.
 const WEB_VITALS_BUNDLE = `${readFileSync(WEB_VITALS_BUNDLE_PATH, 'utf-8')}\nwindow.webVitals = webVitals;`;
 
 export interface WebVitalsMetrics {
@@ -25,7 +24,7 @@ export interface WebVitalsMetrics {
   INP?: number;
 }
 
-/** Web Vitals thresholds — https://web.dev/vitals/ */
+/** https://web.dev/vitals/ */
 export const WEB_VITALS_THRESHOLDS = {
   LCP: { good: 2500, needsImprovement: 4000 }, // milliseconds
   CLS: { good: 0.1, needsImprovement: 0.25 }, // score
@@ -34,7 +33,6 @@ export const WEB_VITALS_THRESHOLDS = {
   INP: { good: 200, needsImprovement: 500 } // milliseconds
 };
 
-/** Loads web-vitals at document-start, so the observers are in place before the app boots. */
 export async function setupWebVitals(page: Page): Promise<void> {
   await page.addInitScript({ content: WEB_VITALS_BUNDLE });
 
@@ -54,8 +52,8 @@ export async function setupWebVitals(page: Page): Promise<void> {
     lib.onFCP(record('FCP'));
     lib.onTTFB(record('TTFB'));
 
-    // Without `reportAllChanges`, CLS and INP only report at page hide. Tests read them
-    // while the page is still visible, so both would stay `null`.
+    // Without reportAllChanges, CLS and INP only report at page hide. Tests read them while the
+    // page is still visible, so both would stay null.
     lib.onCLS(record('CLS'), { reportAllChanges: true });
     lib.onINP(record('INP'), { reportAllChanges: true });
 
@@ -63,10 +61,7 @@ export async function setupWebVitals(page: Page): Promise<void> {
   });
 }
 
-/**
- * Collects the Web Vitals recorded so far: waits for the library, then a settle delay for
- * the late callbacks. Metrics that never arrive come back as `null`.
- */
+/** Waits for the library, then a settle delay for the late callbacks. Missing metrics are null. */
 export async function collectWebVitals(page: Page, timeout: number = 10000): Promise<WebVitalsMetrics> {
   await page.waitForFunction(() => (window as any).__webVitalsLoaded === true, { timeout: 5000 });
 
@@ -79,7 +74,7 @@ export async function collectWebVitals(page: Page, timeout: number = 10000): Pro
   return metrics;
 }
 
-// Reads the `__r3fRenderer` set by Canvas.tsx's onCreated; canvas.getContext() would trigger
+// Reads the __r3fRenderer set by Canvas.tsx's onCreated. canvas.getContext() would trigger
 // context loss on WebKit.
 async function waitForWebGLContext(page: Page, timeout: number = 30000): Promise<boolean> {
   try {
@@ -88,7 +83,7 @@ async function waitForWebGLContext(page: Page, timeout: number = 30000): Promise
         const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
         if (!canvas) return false;
 
-        // Renderer reference only: canvas dimensions stay at the 300x150 default without WebGL.
+        // Renderer reference only, canvas dimensions stay at the 300x150 default without WebGL.
         return !!(canvas as any).__r3fRenderer;
       },
       { timeout, polling: 500 }
@@ -100,14 +95,13 @@ async function waitForWebGLContext(page: Page, timeout: number = 30000): Promise
 }
 
 /**
- * Waits for a <canvas> in the DOM, then the R3F renderer, then a frame with triangles drawn.
- * Triangles prove the renderer is drawing, not that the GLB arrived: the ground and the
- * instanced satellites render outside the Suspense boundary. Pixel sampling would be fooled by
- * the CSS gradient behind the transparent canvas.
+ * Waits for a <canvas>, then the R3F renderer, then a frame with triangles drawn. Triangles prove
+ * the renderer is drawing, not that the GLB arrived. Sampling pixels would just pick up the CSS
+ * gradient behind the transparent canvas.
  */
 export async function waitForR3FScene(page: Page, timeout: number = 30000): Promise<boolean> {
   try {
-    // R3F renders the <canvas> whether or not WebGL initialises: this only proves it mounted.
+    // R3F renders the <canvas> whether or not WebGL initialises, so this only proves it mounted.
     await page.waitForSelector('canvas', { timeout });
 
     const hasWebGL = await waitForWebGLContext(page, timeout);

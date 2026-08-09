@@ -6,8 +6,8 @@ import { expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// Not `waitForR3FScene`: reading a box or a computed style has no reason to fail on an engine
-// with no GL. The wait itself is required; the canvas arrives in a dynamically imported chunk.
+// Not waitForR3FScene: reading a box or a computed style has no reason to fail on an engine with
+// no GL. The wait itself is needed though, the canvas arrives in a dynamically imported chunk.
 async function waitForCanvas(page: Page, timeout = 15000): Promise<boolean> {
   try {
     await page.waitForSelector('canvas', { timeout, state: 'attached' });
@@ -17,15 +17,14 @@ async function waitForCanvas(page: Page, timeout = 15000): Promise<boolean> {
   }
 }
 
-// How long the canvas gets to catch up with a viewport change. A resize makes R3F reallocate
-// the drawbuffer and redraw: a few hundred ms on a laptop GPU, seconds on a runner's
-// SwiftShader. Three viewports at this budget plus the 30 s scene boot is what sets the 120 s
-// per-test timeout in playwright.config.ts; raise one and check the other.
+// How long the canvas gets to catch up with a viewport change. A resize makes R3F reallocate the
+// drawbuffer and redraw: a few hundred ms on a laptop GPU, seconds on a runner's SwiftShader.
+// Three viewports at this budget plus the 30s scene boot is what sets the 120s per-test timeout
+// in playwright.config.ts. Raise one and check the other.
 const RESIZE_SETTLE_TIMEOUT = process.env.CI ? 20000 : 5000;
 
-// These deliberately do not wait for the 3D scene (one exception below): layout is a DOM
-// concern and gating on WebGL would skip them on exactly the engines with flaky headless GL.
-// Scene behaviour lives in scene.spec.ts.
+// These deliberately don't wait for the 3D scene (one exception below). Layout is a DOM concern
+// and gating on WebGL would skip them on exactly the engines with flaky headless GL.
 const VIEWPORTS = [
   { name: 'small phone', width: 320, height: 568, tier: 'mobile' },
   { name: 'phone', width: 375, height: 812, tier: 'mobile' },
@@ -36,7 +35,7 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1920, height: 1080, tier: 'wide' }
 ] as const;
 
-// `breakpointForWidth` is imported, not mirrored: a local copy of the boundaries would reduce
+// breakpointForWidth is imported and not mirrored. A local copy of the boundaries would reduce
 // the tier assertion below to two constants from this file agreeing with each other.
 
 test.describe('Responsive layout', () => {
@@ -49,8 +48,8 @@ test.describe('Responsive layout', () => {
       await pageWithVitals.setViewportSize({ width: viewport.width, height: viewport.height });
       await pageWithVitals.goto('/');
 
-      // Never select by `data-testid`: `reactRemoveProperties` strips it from the production
-      // build, so the selector passes against `vite dev` and fails against the deployed site.
+      // Never select by data-testid, babel-plugin-react-remove-properties strips it from the
+      // production build. Such a selector passes in dev and fails against the deployed site.
       const heading = pageWithVitals.getByRole('heading', { level: 1 });
       await expect(heading).toBeVisible();
 
@@ -185,18 +184,18 @@ test.describe('Touch and pointer handling', () => {
     const overlayCopy = pageWithVitals.getByRole('heading', { level: 1 });
     const selectable = await overlayCopy.evaluate((element) => getComputedStyle(element).userSelect);
 
-    // The overlay exists so the copy is selectable; `user-select: none` on <body> undoes that.
+    // The overlay exists so the copy stays selectable, user-select: none on <body> undoes that.
     expect(selectable).not.toBe('none');
 
     test.skip(!(await waitForCanvas(pageWithVitals)), 'No canvas element on this engine');
 
     const canvas = pageWithVitals.locator('canvas');
 
-    // Asserted on the canvas itself, where globals.css declares it. Walking the ancestor chain
-    // would pass on OrbitControls' inline style and stay green until `src/scene/demo/` is deleted.
+    // On the canvas itself, where globals.css declares it. Walking the ancestor chain would pass
+    // on OrbitControls' inline style and stay green until src/scene/demo/ is deleted.
     expect(
       await canvas.evaluate((element) => getComputedStyle(element).touchAction),
-      'the canvas does not block touch panning — drags will scroll the page'
+      'the canvas does not block touch panning, drags will scroll the page'
     ).toBe('none');
 
     if (isMobile(testInfo)) {

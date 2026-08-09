@@ -29,7 +29,7 @@ const colors = {
   blue: '\x1b[36m'
 };
 
-/** What the template calls itself. Every one of these gets replaced. */
+/** What the template calls itself. All of these get replaced. */
 export const TEMPLATE = {
   title: 'React App Fondation',
   slug: 'react-app-fondation',
@@ -38,17 +38,17 @@ export const TEMPLATE = {
   namespace: 'app'
 };
 
-/** "My Great App" → "my-great-app". Also accepts a slug and leaves it alone. */
+/** "My Great App" -> "my-great-app". Also accepts a slug and leaves it alone. */
 export const toSlug = (name) =>
   name
     .normalize('NFD')
-    // Strip diacritics: a package name may only hold [a-z0-9-._~].
+    // Diacritics out, a package name may only hold [a-z0-9-._~].
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-/** "my-great-app" → "My Great App". A name given with capitals keeps them. */
+/** "my-great-app" -> "My Great App". A name given with capitals keeps them. */
 export const toTitle = (name) =>
   name
     .replace(/[-_]+/g, ' ')
@@ -58,7 +58,7 @@ export const toTitle = (name) =>
     .map((word) => (word === word.toLowerCase() ? word.charAt(0).toUpperCase() + word.slice(1) : word))
     .join(' ');
 
-/** A URL reduced to its origin. Empty for anything unparseable — a valid "not decided yet". */
+/** Reduced to its origin. Empty for anything unparseable, which is a valid "not decided yet". */
 export const toOrigin = (url) => {
   if (!url) return '';
 
@@ -70,8 +70,8 @@ export const toOrigin = (url) => {
 };
 
 /**
- * The find/replace pairs, longest first — replacing the slug before the title would leave a
- * half-rewritten string that no later rule matches.
+ * Longest first. Replacing the slug before the title leaves a half-rewritten string that no
+ * later rule matches.
  */
 export const buildReplacements = (answers) => {
   const pairs = [
@@ -87,18 +87,15 @@ export const buildReplacements = (answers) => {
 
   return (
     pairs
-      // A field left at its template value is not a replacement, it is a no-op that would
-      // otherwise rewrite the file and report it as changed.
+      // A field left at its template value is a no-op that would still rewrite the file and get
+      // reported as changed.
       .filter(([from, to]) => to && from !== to)
       .sort(([a], [b]) => b.length - a.length)
   );
 };
 
-/** Apply the pairs to one file's contents. */
 export const applyReplacements = (content, replacements) =>
   replacements.reduce((text, [from, to]) => text.split(from).join(to), content);
-
-// ─── Files the rewrite touches ────────────────────────────────────────────────
 
 const REWRITE_FILES = [
   'package.json',
@@ -122,8 +119,6 @@ const REWRITE_FILES = [
 
 /** Deleted when the 3D demo is dropped. */
 const DEMO_PATHS = ['src/scene/demo', 'public/assets/models/demo', 'public/assets/models/draco'];
-
-// ─── Disk ─────────────────────────────────────────────────────────────────────
 
 const read = (relativePath) => {
   const full = join(PROJECT_ROOT, relativePath);
@@ -150,20 +145,18 @@ const parseFlags = (argv) => {
   return flags;
 };
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
 
   console.info('');
-  console.info(`${colors.bold}${colors.blue}React App Fondation${colors.reset} — project initialisation`);
+  console.info(`${colors.bold}${colors.blue}React App Fondation${colors.reset} project initialisation`);
   console.info(`${colors.dim}Answers are used to rewrite every place the template names itself.${colors.reset}`);
   if (flags.dryRun) console.info(`${colors.yellow}Dry run: nothing will be written.${colors.reset}`);
   console.info('');
 
   const rl = flags.yes ? null : createInterface({ input: stdin, output: stdout });
 
-  /** Ask, or take the flag / the default when running unattended. */
+  /** Ask, or take the default when running unattended. */
   const ask = async (question, fallback) => {
     if (!rl) return fallback;
 
@@ -198,7 +191,7 @@ async function main() {
   const resetGit = await confirm('Reset git history and create the develop / main / prod branches?', false);
 
   if (rawUrl && !origin) {
-    console.warn(`${colors.yellow}⚠ "${rawUrl}" is not a valid URL — leaving the origin unset.${colors.reset}`);
+    console.warn(`${colors.yellow}⚠ "${rawUrl}" is not a valid URL, leaving the origin unset.${colors.reset}`);
   }
 
   const answers = { title, slug, description, author, namespace };
@@ -207,12 +200,11 @@ async function main() {
   console.info('');
   console.info(`${colors.bold}Renaming${colors.reset}`);
   for (const [from, to] of replacements) {
-    console.info(`  ${colors.dim}${from}${colors.reset} → ${colors.green}${to}${colors.reset}`);
+    console.info(`  ${colors.dim}${from}${colors.reset} -> ${colors.green}${to}${colors.reset}`);
   }
   if (replacements.length === 0) console.info(`  ${colors.dim}(nothing to rename)${colors.reset}`);
   console.info('');
 
-  // ── Rewrite ────────────────────────────────────────────────────────────────
   let rewritten = 0;
 
   for (const relativePath of REWRITE_FILES) {
@@ -227,7 +219,6 @@ async function main() {
     console.info(`  ${colors.green}✓${colors.reset} ${relativePath}`);
   }
 
-  // ── Origin ─────────────────────────────────────────────────────────────────
   if (origin) {
     const envExample = read('.env.example');
     if (envExample) {
@@ -235,7 +226,7 @@ async function main() {
       console.info(`  ${colors.green}✓${colors.reset} .env.example ${colors.dim}(VITE_SITE_URL)${colors.reset}`);
     }
 
-    // A local .env, so `pnpm dev` works straight away. Never committed — see .gitignore.
+    // A local .env so `pnpm dev` works straight away. Gitignored.
     write(
       '.env',
       [
@@ -249,7 +240,6 @@ async function main() {
     console.info(`  ${colors.green}✓${colors.reset} .env ${colors.dim}(created)${colors.reset}`);
   }
 
-  // ── Version history ────────────────────────────────────────────────────────
   const packageJson = read('package.json');
   if (packageJson) {
     write('package.json', packageJson.replace(/"version":\s*"[^"]*"/, '"version": "0.0.0"'), flags.dryRun);
@@ -277,7 +267,6 @@ async function main() {
     `  ${colors.green}✓${colors.reset} version reset to 0.0.0 ${colors.dim}(+ manifests, CHANGELOG)${colors.reset}`
   );
 
-  // ── The demo scene ─────────────────────────────────────────────────────────
   if (dropDemo) {
     for (const path of DEMO_PATHS) {
       const full = join(PROJECT_ROOT, path);
@@ -287,11 +276,10 @@ async function main() {
     }
 
     console.info('');
-    console.info(`${colors.yellow}The demo is gone; two references to it are not:${colors.reset}`);
+    console.info(`${colors.yellow}The demo is gone, two references to it are not:${colors.reset}`);
     console.info('  · src/scene/Experiences.tsx still imports DemoModel and FloatingShapes');
     console.info('  · vitest.config.ts still excludes src/scene/demo/** from coverage');
-    console.info(`  ${colors.dim}Both are deliberate — deleting your scene graph for you is not this${colors.reset}`);
-    console.info(`  ${colors.dim}script's call. Empty Experiences.tsx and drop the exclusion.${colors.reset}`);
+    console.info(`  ${colors.dim}Deliberate: emptying your scene graph is not this script's call.${colors.reset}`);
   }
 
   // ── Git ────────────────────────────────────────────────────────────────────
@@ -310,10 +298,9 @@ async function main() {
     }
   }
 
-  // ── Summary ────────────────────────────────────────────────────────────────
   console.info('');
   if (flags.dryRun) {
-    console.info(`${colors.yellow}Dry run — ${rewritten} file(s) would change. Nothing was written.${colors.reset}`);
+    console.info(`${colors.yellow}Dry run: ${rewritten} file(s) would change, nothing written.${colors.reset}`);
   } else {
     console.info(`${colors.green}${colors.bold}Done.${colors.reset} ${rewritten} file(s) rewritten.`);
     console.info('');
@@ -326,13 +313,13 @@ async function main() {
     );
     console.info(`  ${colors.dim}3.${colors.reset} pnpm dev`);
     console.info('');
-    console.info(`  ${colors.dim}Then delete this script — it has done its job.${colors.reset}`);
+    console.info(`  ${colors.dim}Then delete this script, it has done its job.${colors.reset}`);
   }
   console.info('');
 
   rl?.close();
 }
 
-// `import.meta.main` is true only when this file is the entry point, so importing it from a test
-// runs the exports and nothing else.
+// Only when this file is the entry point, so importing it from a test runs the exports and
+// nothing else.
 if (import.meta.main) await main();

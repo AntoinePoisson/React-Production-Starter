@@ -6,11 +6,8 @@ import { LOCALES, type Locale } from '../src/i18n/Routing';
 
 import '../src/app/globals.css';
 
-/**
- * A locale toolbar rather than one story per language: every piece of copy in the overlay is
- * translated, and the layout has to survive a French string that is a third longer than its
- * English source. Switching in place is how that gets looked at.
- */
+// A locale toolbar rather than one story per language. Every string in the overlay is translated
+// and the layout has to survive a French label a third longer than its English source.
 const preview: Preview = {
   globalTypes: {
     locale: {
@@ -29,9 +26,8 @@ const preview: Preview = {
     (Story, context) => {
       const locale = context.globals.locale as Locale;
 
-      // Keyed on the locale so a switch remounts the tree: `getI18n` returns a fresh instance
-      // per locale, and a provider handed a new instance without a remount keeps the old
-      // catalogue active.
+      // Keyed on the locale so a switch remounts the tree. getI18n returns a fresh instance per
+      // locale, and a provider handed a new one without a remount keeps the old catalogue.
       return (
         <I18nProvider
           key={locale}
@@ -46,12 +42,11 @@ const preview: Preview = {
   parameters: {
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
     a11y: {
-      // Report violations in the panel; `'error'` would fail the story instead, which is the
-      // right setting once the existing ones are cleared.
+      // Reports in the panel. Switch to 'error' to fail the story once the backlog is clear.
       test: 'todo'
     },
     backgrounds: {
-      // The app paints its sky gradient on <body>, which a story does not inherit.
+      // The app paints the sky gradient on <body>, which a story doesn't inherit.
       options: {
         sky: { name: 'Sky', value: 'linear-gradient(180deg, #c9dcf0 0%, #e9eef2 62%)' },
         dark: { name: 'Dark', value: '#0b1220' }

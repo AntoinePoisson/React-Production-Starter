@@ -1,6 +1,5 @@
 import { useLingui } from '@lingui/react/macro';
 
-/** Route-level fallback, shown while a page's chunk loads. */
 export default function Loading() {
   const { t } = useLingui();
 

@@ -68,9 +68,8 @@ describe('Component Smoke Tests', () => {
     });
 
     it('should render the boot fallback without a progress reading', () => {
-      // No percentage, because the shell renders this one before anything has started loading —
-      // and reading drei for the number is what dragged three.js into the first load. The import
-      // rule itself is asserted in `tests/build-validation.test.ts`.
+      // No percentage: the shell renders this before anything starts loading, and reading drei
+      // for the number is what dragged three.js into the first load.
       render(withI18n(<BootLoader />));
       expect(screen.getByText('Loading…')).toBeInTheDocument();
     });
@@ -107,7 +106,7 @@ describe('Component Smoke Tests', () => {
     });
 
     it('should keep its copy selectable', () => {
-      // `pointer-events-none` on the container lets a drag orbit the camera, and also blocks
+      // pointer-events-none on the container lets a drag orbit the camera, and also kills text
       // selection, so every block of copy opts back in.
       const { container } = render(withI18n(<Overlay />));
 

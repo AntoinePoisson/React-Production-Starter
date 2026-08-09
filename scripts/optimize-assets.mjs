@@ -1,37 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Asset Optimization Script
+ * Optimizes images (.jpg, .jpeg, .png, .webp) and 3D models (.glb, .gltf) under public/assets/.
+ * Everything runs locally through sharp and gltf-transform, nothing is uploaded anywhere.
  *
- * Optimizes images (.jpg, .jpeg, .png, .webp) and 3D models (.glb, .gltf) under
- * public/assets/.
+ * Originals are kept beside the file as .original.{ext} and already-optimized files are skipped.
  *
- * Features:
- * - Image optimization with sharp — local, offline, no API key, no upload
- * - GLTF/GLB optimization with Draco compression (60-70% size reduction)
- * - Preserves original files with .original.{ext} naming
- * - Skips already optimized files
- * - Displays size reduction statistics
- *
- * This used to call the TinyPNG API, which meant an account, a key in `.env`, a network
- * round trip per file, a monthly quota, and every texture in the project being uploaded to
- * a third party. `sharp` is already in the tree (it renders the brand assets) and does the
- * same job locally.
- *
- * Scope note: it walks `public/assets/` as a whole, not just `public/assets/models/`. The
- * old path meant `textures` mode looked for images inside the models folder, so a texture
- * anywhere else was never touched.
- *
- * `CONFIG`, `optimizeModel` and `optimizeImage` are exported for
- * `scripts/optimize-staged-assets.mjs`, which runs the same per-file work over the staged diff
- * instead of over the whole tree. Everything below `import.meta.main` only runs when this file
- * is the entry point, so importing it optimises nothing.
+ * CONFIG, optimizeModel and optimizeImage are exported for optimize-staged-assets.mjs, which
+ * runs the same per-file work over the staged diff instead of the whole tree.
  *
  * Usage:
- *   pnpm optimize-assets # Optimize all assets (recommended)
- *   node scripts/optimize-assets.mjs all # Optimize all
- *   node scripts/optimize-assets.mjs models # Only models
- *   node scripts/optimize-assets.mjs textures # Only images
+ *   pnpm optimize-assets                      # everything
+ *   node scripts/optimize-assets.mjs models   # only models
+ *   node scripts/optimize-assets.mjs textures # only images
  */
 
 import fs from 'fs/promises';
@@ -48,26 +29,19 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ASSETS_DIR = path.join(PROJECT_ROOT, 'public/assets');
 
-// Configuration
 export const CONFIG = {
   assetsDir: ASSETS_DIR,
   modelExtensions: ['.glb', '.gltf'],
   imageExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
-  skipIfOriginalExists: true, // Skip optimization if .original file exists
-  /**
-   * Quality settings.
-   *
-   * 82 is the usual sweet spot for photographic content; textures destined for a GPU are
-   * resampled anyway, so pushing higher mostly buys file size. `effort` trades encode time
-   * for a few percent — worth it for an asset committed once and served forever.
-   */
+  skipIfOriginalExists: true,
+  // 82 is the usual sweet spot for photographic content. A texture headed for a GPU gets
+  // resampled anyway, so going higher mostly buys file size.
   jpegQuality: 82,
   webpQuality: 82,
   pngCompressionLevel: 9,
   pngEffort: 10
 };
 
-// Colors for console output
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -77,9 +51,6 @@ const colors = {
   red: '\x1b[31m'
 };
 
-/**
- * Get all files recursively from a directory
- */
 async function getAllFiles(dirPath, extensions) {
   const files = [];
 
@@ -104,17 +75,11 @@ async function getAllFiles(dirPath, extensions) {
   return files;
 }
 
-/**
- * Get file size in bytes
- */
 async function getFileSize(filePath) {
   const stats = await fs.stat(filePath);
   return stats.size;
 }
 
-/**
- * Format bytes to human readable
- */
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -124,18 +89,12 @@ function formatBytes(bytes) {
 }
 
 /**
- * Undo a backup this run created, leaving the tree exactly as it was found.
+ * Undoes a backup this run created. The copy has to be taken before the work starts (sharp can't
+ * safely write to the file it's reading from) but plenty of runs then write nothing, and leaving
+ * the copy behind makes skipIfOriginalExists skip the file forever.
  *
- * The backup has to be taken *before* the work starts — sharp cannot safely write to the
- * file it is reading from — but plenty of runs then decide to write nothing: an asset that
- * is already optimal, or one whose encode threw. Leaving the copy behind in those cases is
- * not harmless: `skipIfOriginalExists` reads it as proof the file was already processed, so
- * every later run skips it and the retry never happens — and a byte-identical duplicate is
- * left in the working tree for someone to commit.
- *
- * `restore` also copies the backup back over the target: an encode that threw mid-write
- * leaves a truncated file, and the whole point of taking the copy was to be able to undo
- * that. A backup that already existed before this run is left alone — it is not ours.
+ * restore also copies the backup back over the target, for an encode that threw mid-write.
+ * A backup that existed before this run is left alone, it isn't ours.
  */
 async function discardBackup(backup, filePath, { restore = false } = {}) {
   if (backup.existed) return;
@@ -144,33 +103,25 @@ async function discardBackup(backup, filePath, { restore = false } = {}) {
     if (restore) await fs.copyFile(backup.path, filePath);
     await fs.unlink(backup.path);
   } catch {
-    // Best effort: failing to clean up a backup must not fail the optimization run.
+    // Best effort, a failed cleanup shouldn't fail the run.
   }
 }
 
-/**
- * Create backup of original file
- */
 async function createBackup(filePath) {
   const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
   const basename = path.basename(filePath, ext);
   const backupPath = path.join(dir, `${basename}.original${ext}`);
 
-  // Check if backup already exists
   try {
     await fs.access(backupPath);
     return { existed: true, path: backupPath };
   } catch {
-    // Backup doesn't exist, create it
     await fs.copyFile(filePath, backupPath);
     return { existed: false, path: backupPath };
   }
 }
 
-/**
- * Optimize GLTF/GLB model with Draco compression
- */
 export async function optimizeModel(filePath) {
   const originalSize = await getFileSize(filePath);
   const backup = await createBackup(filePath);
@@ -181,7 +132,6 @@ export async function optimizeModel(filePath) {
   }
 
   try {
-    // Initialize IO with Draco support
     const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
       'draco3d.decoder': await draco3d.createDecoderModule(),
       'draco3d.encoder': await draco3d.createEncoderModule()
@@ -189,7 +139,6 @@ export async function optimizeModel(filePath) {
 
     const document = await io.read(filePath);
 
-    // Apply optimizations
     await document.transform(
       dedup(), // Remove duplicate vertex data
       prune(), // Remove unused data
@@ -205,18 +154,12 @@ export async function optimizeModel(filePath) {
       })
     );
 
-    /**
-     * Same guard as `optimizeImage`: a model that is already quantised, or small enough
-     * that the Draco header outweighs what it saves, comes out bigger — and writing that
-     * back is a regression dressed up as an optimization. `skipIfOriginalExists` would
-     * then make every later run skip the file, so the regression is permanent.
-     *
-     * `.glb` is a single self-contained file, so serialising it in memory and comparing
-     * is exact. A `.gltf` writes a set of sibling files (`.bin`, textures) whose total is
-     * what actually changed, and comparing only the JSON would be meaningless — so that
-     * path keeps writing unconditionally. Prefer `.glb`: this script never converts one
-     * form to the other, it writes back over whatever it was given.
-     */
+    // Same guard as optimizeImage. An already-quantised model, or one small enough that the
+    // Draco header costs more than it saves, comes out bigger.
+    //
+    // Only for .glb: it's a single self-contained file, so comparing in memory is exact. A .gltf
+    // writes sibling files (.bin, textures) whose total is what actually changed, so that path
+    // keeps writing unconditionally.
     const isBinary = path.extname(filePath).toLowerCase() === '.glb';
 
     if (isBinary) {
@@ -224,7 +167,7 @@ export async function optimizeModel(filePath) {
 
       if (output.length >= originalSize) {
         console.info(`  ${colors.yellow}⏭  Skipped${colors.reset} (already optimal)`);
-        // Nothing was written, so nothing needs backing up.
+        // Nothing written, so nothing to back up.
         await discardBackup(backup, filePath);
         return { skipped: true, originalSize, newSize: originalSize };
       }
@@ -251,11 +194,9 @@ export async function optimizeModel(filePath) {
 }
 
 /**
- * Optimize an image in place with sharp, keeping its format.
- *
- * Format-preserving on purpose: a `.png` with transparency re-encoded as JPEG loses the
- * alpha channel, and a texture referenced by a `.gltf` cannot change extension without
- * editing the model. Converting to WebP/AVIF is a separate, deliberate decision.
+ * In place, keeping the format. A .png with transparency re-encoded as JPEG loses the alpha
+ * channel, and a texture referenced by a .gltf can't change extension without editing the model.
+ * Converting to WebP/AVIF is a separate decision.
  */
 export async function optimizeImage(filePath) {
   const originalSize = await getFileSize(filePath);
@@ -268,8 +209,7 @@ export async function optimizeImage(filePath) {
 
   try {
     const extension = path.extname(filePath).toLowerCase();
-    // Read from the backup, not the target: sharp cannot safely write to the file it is
-    // still reading from.
+    // Read from the backup, sharp can't safely write to the file it's still reading.
     const pipeline = sharp(backup.path);
 
     if (extension === '.png') {
@@ -282,11 +222,10 @@ export async function optimizeImage(filePath) {
 
     const output = await pipeline.toBuffer();
 
-    // Some assets are already optimal. Writing a larger file back would be a regression
-    // dressed up as an optimization.
+    // Some assets are already optimal, writing a larger file back is a regression.
     if (output.length >= originalSize) {
       console.info(`  ${colors.yellow}⏭  Skipped${colors.reset} (already optimal)`);
-      // Nothing was written, so nothing needs backing up.
+      // Nothing written, so nothing to back up.
       await discardBackup(backup, filePath);
       return { skipped: true, originalSize, newSize: originalSize };
     }
@@ -309,13 +248,9 @@ export async function optimizeImage(filePath) {
   }
 }
 
-/**
- * Main optimization function
- */
 async function optimizeAssets(type = 'all') {
   console.info(`${colors.bright}${colors.blue}🚀 Asset Optimization${colors.reset}\n`);
 
-  // Check if assets directory exists
   try {
     await fs.access(CONFIG.assetsDir);
   } catch {
@@ -328,7 +263,6 @@ async function optimizeAssets(type = 'all') {
     images: { total: 0, optimized: 0, skipped: 0, errors: 0, savedBytes: 0 }
   };
 
-  // Optimize models
   if (type === 'all' || type === 'models') {
     console.info(`${colors.bright}📦 Optimizing 3D Models${colors.reset}`);
     const modelFiles = await getAllFiles(CONFIG.assetsDir, CONFIG.modelExtensions);
@@ -353,7 +287,6 @@ async function optimizeAssets(type = 'all') {
     }
   }
 
-  // Optimize images
   if (type === 'all' || type === 'textures') {
     console.info(`${colors.bright}🖼️  Optimizing Images${colors.reset}`);
     const imageFiles = await getAllFiles(CONFIG.assetsDir, CONFIG.imageExtensions);
@@ -378,7 +311,6 @@ async function optimizeAssets(type = 'all') {
     }
   }
 
-  // Print summary
   console.info(`${colors.bright}📊 Summary${colors.reset}`);
   console.info('─'.repeat(50));
 
@@ -404,14 +336,13 @@ async function optimizeAssets(type = 'all') {
   console.info('─'.repeat(50));
   console.info(`${colors.bright}${colors.green}Total Saved: ${formatBytes(totalSaved)}${colors.reset}\n`);
 
-  // Show note about originals
   if (stats.models.optimized > 0 || stats.images.optimized > 0) {
     console.info(`${colors.bright}ℹ️  Note:${colors.reset} Original files backed up with .original.{ext} extension`);
     console.info(`${colors.bright}ℹ️  To restore:${colors.reset} Rename .original files back to original names\n`);
   }
 }
 
-// ─── Below here only runs when the script is executed, not when it is imported ──
+// Only runs when this file is the entry point, so importing it optimizes nothing.
 if (import.meta.main) {
   // 'all', 'models', or 'textures'
   const type = process.argv[2] || 'all';

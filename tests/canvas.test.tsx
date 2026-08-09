@@ -4,7 +4,7 @@ import path from 'path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-// Three.js does not run under jsdom. Keep the props so a test can drive `onCreated`.
+// three.js doesn't run under jsdom. Keep the props so a test can drive onCreated.
 const { canvasProps } = vi.hoisted(() => ({ canvasProps: [] as Record<string, unknown>[] }));
 
 vi.mock('@react-three/fiber', () => ({
@@ -32,8 +32,8 @@ import { withI18n } from './helpers/withI18n';
 
 describe('ThreeCanvas', () => {
   it('should not claim a layout through classes R3F overrides', () => {
-    // R3F spreads `className` onto a div it already inline-styles position/width/height on,
-    // and an inline style beats a class. The viewport fill comes from <main>, not from here.
+    // R3F spreads className onto a div it already inline-styles position/width/height on, and an
+    // inline style beats a class.
     render(
       withI18n(
         <ThreeCanvas>
@@ -47,7 +47,7 @@ describe('ThreeCanvas', () => {
     expect(canvas).toHaveClass('outline-none');
 
     for (const overridden of ['fixed', 'top-0', 'left-0', 'h-full', 'w-full']) {
-      expect(canvas, `"${overridden}" loses to R3F's inline style — it states nothing`).not.toHaveClass(overridden);
+      expect(canvas, `"${overridden}" loses to R3F's inline style, it states nothing`).not.toHaveClass(overridden);
     }
   });
 
@@ -64,7 +64,7 @@ describe('ThreeCanvas', () => {
   });
 
   it('should not try to guard gestures with a utility class', () => {
-    // R3F puts `className` on its wrapper div, not on the <canvas>: the rule belongs in globals.css.
+    // R3F puts className on its wrapper div, not on the <canvas>, so the rule goes in globals.css.
     render(
       withI18n(
         <ThreeCanvas>
@@ -77,15 +77,15 @@ describe('ThreeCanvas', () => {
   });
 
   it('should have that gesture rule declared on the canvas itself', () => {
-    // Nothing in R3F sets `touch-action`. The value that exists at runtime comes from
-    // OrbitControls, which clears it on `disconnect()`, so the rule has to live in the CSS.
+    // Nothing in R3F sets touch-action. The runtime value comes from OrbitControls, which clears
+    // it on disconnect(), so the rule has to live in the CSS.
     const css = readFileSync(path.join(__dirname, '..', 'src', 'app', 'globals.css'), 'utf-8');
 
     expect(css).toMatch(/canvas\s*\{[^}]*touch-action:\s*none/);
   });
 
   describe('onCreated', () => {
-    /** Render, then call `onCreated` with a stand-in for the R3F root state. */
+    /** Render, then call onCreated with a stand-in for the R3F root state. */
     const create = () => {
       canvasProps.length = 0;
       render(
@@ -113,8 +113,8 @@ describe('ThreeCanvas', () => {
     it('should expose the renderer, camera and scene on the canvas element', () => {
       const { domElement, root } = create();
 
-      // The E2E suite reads these instead of canvas.getContext(), which triggers context loss
-      // on WebKit. Renaming `__r3fRenderer` breaks e2e/utils/webVitals and e2e/scene.spec.ts.
+      // The E2E suite reads these instead of canvas.getContext(), which triggers context loss on
+      // WebKit. Renaming __r3fRenderer breaks e2e/utils/webVitals and e2e/scene.spec.ts.
       const exposed = domElement as unknown as Record<string, unknown>;
       expect(exposed.__r3fRenderer).toBe(root.gl);
       expect(exposed.__r3fCamera).toBe(root.camera);
@@ -131,8 +131,8 @@ describe('ThreeCanvas', () => {
     it('should stop contextmenu at the canvas so the right-click menu survives', () => {
       const { domElement } = create();
 
-      // Stand-in for the R3F container, where drei connects OrbitControls: three's handler
-      // there preventDefaults every contextmenu, so it must never be reached.
+      // Stand-in for the R3F container, where drei connects OrbitControls. Its handler
+      // preventDefaults every contextmenu, so it must never be reached.
       const container = document.createElement('div');
       const orbitControlsHandler = vi.fn((event: Event) => event.preventDefault());
       container.appendChild(domElement);

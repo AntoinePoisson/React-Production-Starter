@@ -2,9 +2,9 @@ import { expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { WEB_VITALS_THRESHOLDS, waitForR3FScene } from './utils/webVitals';
 
-// Timing thresholds only mean something against the production build: `vite dev` inflates
+// Timing thresholds only mean anything against the production build, `vite dev` inflates
 // LCP/FCP/TTFB by seconds. CI serves the static export, so it asserts.
-// Force it locally with: BASE_URL=http://localhost:3200 pnpm e2e   (after `pnpm website`)
+// Locally: pnpm website, then BASE_URL=http://localhost:3200 pnpm e2e
 const MEASURES_PRODUCTION_BUILD = Boolean(process.env.CI || process.env.BASE_URL);
 
 test.describe('Performance', () => {
@@ -13,29 +13,28 @@ test.describe('Performance', () => {
   test('should have acceptable Core Web Vitals', async ({ pageWithVitals }, testInfo) => {
     await pageWithVitals.goto('/');
 
-    // Vitals from a page that never booted are flattering nonsense: no 3D means no
-    // main-thread work means a great LCP. Skip rather than measure the overlay alone.
+    // Vitals from a page that never booted are flattering nonsense. No 3D means no main-thread
+    // work means a great LCP, so skip rather than measure the overlay on its own.
     const sceneReady = await waitForR3FScene(pageWithVitals);
     if (!sceneReady) {
       if (requiresWorkingWebGL(testInfo)) throw new Error(SCENE_BOOT_FAILURE);
       test.skip(true, 'Headless WebGL unavailable on this engine');
     }
 
-    // Interact with the page to trigger INP measurement
+    // INP needs an interaction before it reports anything.
     await pageWithVitals.mouse.move(100, 100);
     await pageWithVitals.mouse.click(100, 100);
     await pageWithVitals.waitForTimeout(2000);
 
     const metrics = await pageWithVitals.getWebVitals();
 
-    // Layout stability does not depend on how the app is served. `!= null` rather than
-    // truthiness: a perfectly stable page reports CLS 0. Still a guard, because only Chromium
-    // implements the `layout-shift` entry type.
+    // Layout stability doesn't depend on how the app is served. `!= null` and not truthiness, a
+    // perfectly stable page reports CLS 0. Still guarded, only Chromium implements layout-shift.
     if (metrics.CLS != null) {
       expect(metrics.CLS).toBeLessThan(WEB_VITALS_THRESHOLDS.CLS.needsImprovement);
     }
 
-    // Thresholds use "needsImprovement" — lenient enough for a 3D app.
+    // needsImprovement rather than good, lenient enough for a 3D app.
     if (MEASURES_PRODUCTION_BUILD) {
       if (metrics.LCP) {
         expect(metrics.LCP).toBeLessThan(WEB_VITALS_THRESHOLDS.LCP.needsImprovement);
@@ -50,7 +49,7 @@ test.describe('Performance', () => {
       }
     } else {
       console.info(
-        `[web-vitals] dev server — thresholds not asserted. ` +
+        `[web-vitals] dev server, thresholds not asserted. ` +
           `LCP=${metrics.LCP?.toFixed(0)}ms FCP=${metrics.FCP?.toFixed(0)}ms TTFB=${metrics.TTFB?.toFixed(0)}ms`
       );
     }
@@ -105,8 +104,8 @@ test.describe('Performance', () => {
 
     if (finalMemory !== null) {
       const growthRatio = (finalMemory - initialMemory) / initialMemory;
-      // Three.js leaks show 20-30% growth per reload when geometries/textures/materials
-      // are not disposed.
+      // A three.js leak shows 20-30% growth per reload when geometries/textures/materials aren't
+      // disposed.
       expect(growthRatio).toBeLessThan(0.5);
 
       await testInfo.attach('benchmark:Memory Growth (5 reloads)', {

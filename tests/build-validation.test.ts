@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { SITE_TITLE } from '@/utils/config/Identity';
 
-// `process.cwd()` rather than `import.meta.url`: under Vitest's module runner the latter is an
-// http:// URL, which `fileURLToPath` refuses. Vitest always runs from the project root.
+// process.cwd() rather than import.meta.url: under Vitest's module runner the latter is an
+// http:// URL and fileURLToPath refuses it. Vitest always runs from the project root anyway.
 const PROJECT_ROOT = process.cwd();
 
 const read = (relativePath: string) => readFileSync(join(PROJECT_ROOT, relativePath), 'utf-8');
@@ -14,38 +14,29 @@ const readJson = (relativePath: string) => JSON.parse(read(relativePath));
 
 const packageJson = readJson('package.json');
 
-/**
- * Invariants of the build itself — the wiring nobody exercises by hand and everybody inherits.
- *
- * Every assertion here stands for a way the site has actually been shipped broken: a build step
- * dropped from the chain, a colour that stopped matching its manifest, a `.env` that reached the
- * repository. A unit test is the cheapest place to catch each of them.
- */
+// Invariants of the build wiring, the part nobody exercises by hand.
 describe('Build pipeline', () => {
   const build: string = packageJson.scripts.build;
 
   it('should compile the catalogues strictly before building', () => {
-    // `--strict` is what refuses a missing translation. Without it the build ships a French page
-    // with English fallbacks and nothing says so.
+    // --strict is what refuses a missing translation. Without it the build ships a French page
+    // with English fallbacks and says nothing.
     expect(build).toContain('lingui compile --strict');
   });
 
   it('should run the post-build step after the build', () => {
-    // SEO files, service worker, and the CSP meta's position in the document. `vite build` on
-    // its own emits a site with none of them.
+    // SEO files, service worker, CSP position. `vite build` alone emits a site with none of them.
     expect(build).toContain('scripts/postbuild.mjs');
     expect(build.indexOf('vite build')).toBeLessThan(build.indexOf('scripts/postbuild.mjs'));
   });
 
   it('should keep the hashed bundles out of the verbatim asset directory', () => {
-    // `public/assets/models/` is copied through untouched. Sharing a directory with the
-    // content-hashed bundles makes every size-limit glob and every cache rule ambiguous.
     expect(read('vite.config.ts')).toContain("assetsDir: 'static'");
   });
 
   it('should measure bundle sizes against the client output only', () => {
-    // `dist/server` is the render pass that produced the pages; a static site never deploys it,
-    // so counting its bytes would make the budgets meaningless.
+    // dist/server is the render pass, never deployed, so counting its bytes would make the
+    // budgets meaningless.
     for (const entry of packageJson['size-limit'] as { path: string }[]) {
       expect(entry.path).toMatch(/^dist\/client\//);
     }
@@ -53,18 +44,15 @@ describe('Build pipeline', () => {
 });
 
 describe('Critical path', () => {
-  /** Specifiers of the `import … from '…'` statements only — `import()` expressions are not one. */
+  /** Static import specifiers only, an import() expression is not one. */
   const staticImports = (relativePath: string): string[] =>
     [...read(relativePath).matchAll(/^import\b[^;]*?from '([^']+)';/gm)].map((match) => match[1]);
 
   const PULLS_IN_THREE = /^three$|^@react-three\/|^@\/components\/three\/|^@\/scene\//;
 
   it('should keep three.js out of the document shell', () => {
-    // The shell is in the entry graph, so every static import it makes is downloaded before first
-    // paint. It once imported a loader that only called drei's `useProgress`, and that alone put
-    // three.js + drei — ~220 kB brotli — back on the critical path, `modulepreload`ed in the head,
-    // where they cost seconds of LCP on a throttled connection. The scene is `lazy` for a reason;
-    // this asserts nothing quietly undoes it.
+    // Every static import the shell makes downloads before first paint. It once imported a loader
+    // that only called drei's useProgress, and that put ~220 kB back on the critical path.
     for (const specifier of staticImports('src/routes/__root.tsx')) {
       expect(specifier, `__root.tsx statically imports ${specifier}`).not.toMatch(PULLS_IN_THREE);
     }
@@ -83,15 +71,14 @@ describe('Toolchain pins', () => {
   });
 
   it('should declare the Node floor its dependencies require', () => {
-    // jsdom 30, npm-check-updates 23 and a growing list of others ship
-    // `^22.22.2 || ^24.15.0 || >=26.0.0`.
+    // jsdom 30, npm-check-updates 23 and a growing list of others declare
+    // ^22.22.2 || ^24.15.0 || >=26.0.0.
     expect(packageJson.engines.node).toBe('>=24.15.0');
   });
 
   it('should keep TypeScript below 6.1', () => {
-    // `@typescript-eslint/parser` declares `typescript >=4.8.4 <6.1.0`. Moving past it breaks
-    // `pnpm lint`, and with it the pre-commit hook and the CI lint job.
-    // Tripwire: npm view @typescript-eslint/parser peerDependencies
+    // @typescript-eslint/parser declares typescript >=4.8.4 <6.1.0. Past it, lint breaks.
+    // Check with: npm view @typescript-eslint/parser peerDependencies
     expect(packageJson.devDependencies.typescript).toMatch(/^\^5\./);
   });
 });
@@ -114,8 +101,8 @@ describe('Test configuration', () => {
   const vitestConfig = read('vitest.config.ts');
 
   it('should enforce full coverage', () => {
-    // The number is the point: at 100%, adding an untested branch fails the run. At 95% it is a
-    // budget to spend, and the branches that go untested are the ones nobody exercises by hand.
+    // At 100% an untested branch fails the run. At 95% it's a budget to spend, and what goes
+    // untested is exactly what nobody exercises by hand.
     expect(vitestConfig).toContain('statements: 100');
     expect(vitestConfig).toContain('branches: 100');
     expect(vitestConfig).toContain('functions: 100');
@@ -133,7 +120,6 @@ describe('Theme consistency', () => {
   const manifest = readJson('public/manifest.json');
   const metadata = read('src/app/Metadata.ts');
 
-  /** Read a `@theme static` token straight out of the stylesheet. */
   const cssToken = (name: string): string => {
     const match = globalsCss.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{3,8})`));
     expect(match, `--color-${name} not found in globals.css`).not.toBeNull();
@@ -141,8 +127,8 @@ describe('Theme consistency', () => {
   };
 
   it('should paint the manifest in the same colours as the page', () => {
-    // A theme colour that drifts from the CSS shows up as a flash of the wrong colour on launch
-    // from the home screen — and nowhere else, which is why it survives review.
+    // Drift shows up as a flash of the wrong colour on launch from the home screen, and nowhere
+    // else, which is why it survives review.
     expect(manifest.theme_color.toLowerCase()).toBe(cssToken('sky-top'));
     expect(manifest.background_color.toLowerCase()).toBe(cssToken('sky-horizon'));
   });
@@ -152,9 +138,8 @@ describe('Theme consistency', () => {
   });
 
   it('should declare the tokens the 3D scene reads at runtime', () => {
-    // `@theme static`, not `@theme`: Tailwind v4 prunes theme variables no utility class
-    // references, and `Palette.ts` reads these from `getComputedStyle` — which that analysis
-    // cannot see.
+    // Must be @theme static. Tailwind v4 prunes theme variables no utility class references, and
+    // Palette.ts reads these through getComputedStyle, which that analysis can't see.
     expect(globalsCss).toContain('@theme static');
     for (const token of ['scene-floor', 'scene-prop', 'accent']) {
       expect(globalsCss).toContain(`--color-${token}:`);
@@ -166,13 +151,9 @@ describe('Web app manifest', () => {
   const manifest = readJson('public/manifest.json');
 
   it('should name the app what the rest of the project calls it', () => {
-    // The manifest shipped as `xxtemplatexx`, describing itself as a Next.js template, because
-    // nothing compared it to anything. No module imports it, so no build step reads it and no
-    // type covers it — an installed PWA is the only place the drift ever shows up, under the
-    // icon on someone's home screen.
-    //
-    // Asserted against `Identity.ts` and `package.json` rather than against literals: all three
-    // are rewritten by `node initialize.js`, so this holds for the renamed project too.
+    // Nothing imports the manifest, so an installed PWA is the only place drift shows up.
+    // Compared against Identity.ts and package.json rather than literals, initialize.js rewrites
+    // all three and this has to hold for the renamed project too.
     expect(manifest.name).toBe(SITE_TITLE);
     expect(manifest.short_name).toBe(SITE_TITLE);
     expect(manifest.description).toBe(packageJson.description);
@@ -204,14 +185,14 @@ describe('Repository hygiene', () => {
   });
 
   it('should ship the local Draco decoder', () => {
-    // `useGLTF(path, DRACO_PATH)` points at these files rather than a CDN, which keeps the CSP
-    // tight and the app offline-capable.
+    // useGLTF(path, DRACO_PATH) points at these rather than a CDN, which keeps the CSP tight and
+    // the app offline-capable.
     for (const file of ['draco_decoder.js', 'draco_decoder.wasm', 'draco_wasm_wrapper.js']) {
       expect(existsSync(join(PROJECT_ROOT, 'public/assets/models/draco', file))).toBe(true);
     }
   });
 
-  it('should ship a 1200×630 social preview', () => {
+  it('should ship a 1200x630 social preview', () => {
     const png = readFileSync(join(PROJECT_ROOT, 'public/og-image.png'));
 
     // PNG IHDR: width and height are big-endian uint32 at byte 16 and 20.
@@ -224,9 +205,9 @@ describe('Content Security Policy', () => {
   const metadata = read('src/app/Metadata.ts');
 
   it('should never allow eval', () => {
-    // `'unsafe-inline'` is a documented compromise (the router injects inline scripts at runtime,
-    // and a static site has no nonce). `'unsafe-eval'` is not — nothing here needs it, and it
-    // turns every injected string into executable code.
+    // 'unsafe-inline' is a documented compromise (the router injects inline scripts at runtime
+    // and we have no nonce). 'unsafe-eval' is not: nothing needs it, and it turns every injected
+    // string into executable code.
     expect(metadata).not.toContain("'unsafe-eval'");
   });
 
@@ -234,9 +215,9 @@ describe('Content Security Policy', () => {
     expect(metadata).toContain("'wasm-unsafe-eval'");
   });
 
-  // Whether `frame-ancestors` is absent is asserted in `tests/app/metadata.test.ts`, against the
-  // built policy string — this file reads the source, where the word also appears in the comment
-  // explaining why it is not there.
+  // frame-ancestors is asserted absent in tests/app/metadata.test.ts, against the built policy.
+  // Not here: this file reads the source, where the word also shows up in the comment explaining
+  // why it's missing.
 
   it('should keep the directives a meta tag does enforce', () => {
     expect(metadata).toContain("object-src 'none'");

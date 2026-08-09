@@ -2,7 +2,7 @@ import { expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// `hydration`/`Hydration` do silence a genuine bug under `vite dev`. Kept deliberately.
+// hydration/Hydration do silence a genuine bug under vite dev. Kept anyway, for now.
 const IGNORED_ERROR_PATTERNS = [
   // Dev tooling
   'DevTools',
@@ -14,7 +14,7 @@ const IGNORED_ERROR_PATTERNS = [
   'Hydration',
   'webpack',
   'hot-reloader',
-  // WebGL/Three.js runtime errors (expected in CI with software renderers)
+  // WebGL/three.js runtime errors, expected in CI with software renderers
   'WebGL',
   'webgl',
   'GL_INVALID',
@@ -23,7 +23,7 @@ const IGNORED_ERROR_PATTERNS = [
   'Shader',
   'context lost',
   'CONTEXT_LOST',
-  // Pointer lock is not supported in headless browsers
+  // No pointer lock in headless browsers
   'Pointer lock',
   'pointer lock',
   'WrongDocumentError'
@@ -33,8 +33,8 @@ function filterConsoleErrors(errors: string[]): string[] {
   return errors.filter((e) => !IGNORED_ERROR_PATTERNS.some((pattern) => e.includes(pattern)));
 }
 
-// `chromium` and `mobile-chrome` run SwiftShader and must boot the scene; `firefox`, `webkit`
-// and `mobile-safari` may bail out. `requiresWorkingWebGL` in utils/testHelpers.ts decides.
+// chromium and mobile-chrome run SwiftShader and have to boot the scene. firefox, webkit and
+// mobile-safari are allowed to bail out, see requiresWorkingWebGL in utils/testHelpers.ts.
 test.describe('3D Scene', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -162,7 +162,7 @@ test.describe('3D Scene', () => {
       return { avgFps, minFps, firstThirdAvg, lastThirdAvg, totalSeconds: buckets.length };
     });
 
-    // 1. Scene is still alive.
+    // Still alive?
     const sceneState = await pageWithVitals.evaluate(() => {
       const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
       if (!canvas) return { alive: false, contextLost: true };
@@ -182,11 +182,10 @@ test.describe('3D Scene', () => {
 
     expect(sceneState.alive).toBe(true);
 
-    // 2. No runtime errors
     const filteredErrors = filterConsoleErrors(consoleErrors);
     expect(filteredErrors.length).toBe(0);
 
-    // 3. FPS stability (hardware-independent: checks degradation, not absolute value)
+    // Degradation rather than an absolute value, so this means something on any hardware.
     if (fpsReport) {
       const degradationRatio = fpsReport.lastThirdAvg / fpsReport.firstThirdAvg;
       expect(degradationRatio).toBeGreaterThan(0.5);
@@ -216,7 +215,7 @@ test.describe('3D Scene', () => {
       }
     }
 
-    // 4. Memory hasn't exploded (Chromium only)
+    // Chromium only.
     if (initialMemory !== null) {
       const finalMemory = await pageWithVitals.evaluate(() => {
         if ('memory' in performance) return (performance as any).memory.usedJSHeapSize;

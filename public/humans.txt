@@ -7,7 +7,7 @@
 
                     /* SITE */
 
-    React App Fondation — a production starter for static React
+    React App Fondation, a production starter for static React
     sites with a WebGL scene. Replace this block with a line or
     two about what your project actually is.
 
@@ -20,4 +20,4 @@
     Tests: Vitest, Playwright
     Hosting: bring your own
 
-    Last updated: v0.1.0 — 2026/08/05
+    Last updated: v0.1.0, 2026/08/05

@@ -16,8 +16,8 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('@/app/Boot', () => ({ useBoot }));
 vi.mock('@/app/globals.css?url', () => ({ default: '/assets/globals.css' }));
 
-// three.js has no WebGL context under jsdom. Stubbing the renderer rather than the canvas module
-// keeps the shell's own `lazy(() => import(…))` calls on the real path.
+// No WebGL context under jsdom. Stub the renderer and not the canvas module, so the shell's own
+// lazy(() => import(...)) calls stay on the real path.
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid='canvas'>{children}</div>,
   useFrame: () => {},
@@ -43,10 +43,6 @@ type RootOptions = {
 
 const root = Route as unknown as RootOptions;
 
-/**
- * The document shell. There is no `index.html`: this component renders `<html>` itself, which is
- * what lets `<html lang>` differ per locale without the two duplicated root layouts Next needed.
- */
 describe('Root route', () => {
   it('should link the stylesheet alongside the root head tags', () => {
     const { links, meta } = root.head();
@@ -56,8 +52,8 @@ describe('Root route', () => {
   });
 
   it('should declare a boundary for every abnormal state', () => {
-    // A route with no `errorComponent` renders a blank page on a thrown error, which is
-    // indistinguishable from a build that never booted.
+    // A route with no errorComponent renders a blank page on a throw, which is impossible to
+    // tell apart from a build that never booted.
     expect(root.notFoundComponent).toBeDefined();
     expect(root.errorComponent).toBeDefined();
     expect(root.pendingComponent).toBeDefined();
@@ -73,9 +69,9 @@ describe('Root route', () => {
 
     const Shell = root.shellComponent;
 
-    // Rendered to markup rather than into jsdom, because that is what the build actually does:
-    // `<html>` is a document-level element React treats specially when mounting into a
-    // container, and the attribute under test would never appear there.
+    // Rendered to markup rather than into jsdom, which is what the build does anyway. <html> is
+    // a document-level element React treats specially when mounting into a container, and the
+    // attribute under test would never show up there.
     expect(renderToStaticMarkup(<Shell>{null}</Shell>)).toContain(`<html lang="${expected}">`);
   });
 
@@ -95,17 +91,17 @@ describe('Root route', () => {
     const Shell = root.shellComponent;
     render(<Shell>{null}</Shell>);
 
-    // This placement is the whole reason a language switch keeps its WebGL context: `/` and
-    // `/fr` are different routes, so a scene mounted inside either one is destroyed and rebuilt
-    // on every switch — a full three.js re-parse, and the camera back at its starting position.
+    // This placement is the whole reason a language switch keeps its WebGL context. / and /fr
+    // are different routes, so a scene mounted inside either gets destroyed and rebuilt on every
+    // switch: full three.js reparse, camera back at its starting position.
     expect(await screen.findByTestId('canvas')).toBeInTheDocument();
   });
 
   it('should not pre-render the canvas', () => {
     pathname = '/';
 
-    // three.js needs a WebGL context and the pre-render runs in Node. The overlay, by contrast,
-    // must be in that HTML — which is why only one of the two is wrapped in `<ClientOnly>`.
+    // three.js needs a WebGL context and the prerender runs in Node. The overlay does have to be
+    // in that HTML, which is why only one of the two is wrapped in <ClientOnly>.
     const Shell = root.shellComponent;
 
     expect(renderToStaticMarkup(<Shell>{null}</Shell>)).not.toContain('data-testid="canvas"');

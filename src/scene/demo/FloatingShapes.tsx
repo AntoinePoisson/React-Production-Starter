@@ -6,23 +6,22 @@ import type { Breakpoint } from '@/utils/screen/Breakpoints';
 import { useBreakpoint } from '@/utils/screen/useBreakpoint';
 import { sceneColor } from '@/utils/theme/Palette';
 
-// Scene density by device. Width is only a proxy for GPU budget: tier on hardwareConcurrency,
-// devicePixelRatio or a short FPS probe if a project turns out to be GPU-bound.
+// Density per device. Width is a rough proxy for GPU budget, tier on hardwareConcurrency or a
+// short FPS probe if a project turns out to be really GPU-bound.
 const COUNT_BY_BREAKPOINT: Record<Breakpoint, number> = { wide: 28, desktop: 22, tablet: 16, mobile: 10 };
 
 const GOLDEN_ANGLE = 2.399963229728653;
 
-// Reused every frame: never allocate inside useFrame.
+// Reused every frame. Never allocate inside useFrame, it shows up immediatly in the profiler.
 const dummy = new Object3D();
 
 type Satellite = { radius: number; speed: number; phase: number; height: number; scale: number };
 
-/** Satellites orbiting the model, one draw call for the whole swarm. */
 export default function FloatingShapes() {
   const meshRef = useRef<InstancedMesh>(null);
   const count = COUNT_BY_BREAKPOINT[useBreakpoint()];
 
-  // Golden angle rather than Math.random: identical on every reload, so snapshots stay stable.
+  // Golden angle instead of Math.random so the layout is identical on every reload.
   const satellites = useMemo<Satellite[]>(
     () =>
       Array.from({ length: count }, (_, i) => {

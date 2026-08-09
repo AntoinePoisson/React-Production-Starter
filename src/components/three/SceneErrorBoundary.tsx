@@ -5,15 +5,13 @@ import { createLogger } from '@/utils/logger/Logger';
 const log = createLogger('scene-boundary');
 
 /**
- * Keeps one failed asset from taking the whole page down. `<Suspense>` catches pending, never
- * failed: suspend-react caches a rejected GLB and re-throws it on every render, so without a
- * boundary inside the scene the throw reaches `app/[locale]/error.tsx`, which replaces `<main>`.
- * A class because `getDerivedStateFromError` has no hook equivalent. No retry here: reload is the
- * recovery.
+ * Suspense catches pending, never failed: suspend-react caches a rejected GLB and rethrows it on
+ * every render, so without this the throw replaces the whole page. A class because
+ * getDerivedStateFromError still has no hook equivalent.
  */
 interface Props {
   children: ReactNode;
-  /** Rendered in place of the children once they have failed. Must be scene-safe. */
+  /** Has to be scene-safe. */
   fallback?: ReactNode;
 }
 
@@ -29,7 +27,7 @@ export default class SceneErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    // `once` because a failed subtree is re-rendered by any parent update.
+    // once() because any parent update re-renders the failed subtree.
     log.once('scene-subtree-failed').error('Scene subtree failed to render', error);
   }
 

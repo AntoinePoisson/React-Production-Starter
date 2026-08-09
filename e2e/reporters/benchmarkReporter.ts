@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { FullConfig, FullResult, Reporter, Suite, TestCase, TestResult } from '@playwright/test/reporter';
 
-/** Payload of a `benchmark:` attachment written by testInfo.attach() in an E2E test. */
+/** Payload of a benchmark: attachment written by testInfo.attach() in a spec. */
 interface BenchmarkAttachment {
   name: string;
   unit: string;
@@ -26,7 +26,7 @@ interface MetricAccumulator {
   unit: string;
   direction: 'smaller' | 'bigger';
   values: number[];
-  source: string; // "test title — suite title", from the first occurrence
+  source: string; // "test title / suite title", from the first occurrence
 }
 
 const OUTPUT_DIR = 'reports/benchmark';
@@ -44,11 +44,9 @@ function variance(values: number[], mean: number): number {
 }
 
 /**
- * Collects `benchmark:` attachments from passed tests into benchmark-{smaller,bigger}.json
- * for github-action-benchmark. Repeated values for one metric (`--repeat-each`) collapse to
- * their median, with the spread in `extra`.
- *
- * Activate with BENCHMARK=true.
+ * Collects benchmark: attachments from passed tests into benchmark-{smaller,bigger}.json for
+ * github-action-benchmark. Repeated values for one metric (--repeat-each) collapse to their
+ * median, with the spread in `extra`. Enable with BENCHMARK=true.
  */
 class BenchmarkReporter implements Reporter {
   private metrics: Map<string, MetricAccumulator> = new Map();
@@ -84,7 +82,7 @@ class BenchmarkReporter implements Reporter {
           unit: data.unit,
           direction: data.direction,
           values: [data.value],
-          source: `${test.title} — ${test.parent.title}`
+          source: `${test.title} / ${test.parent.title}`
         });
       }
     }
@@ -139,8 +137,8 @@ class BenchmarkReporter implements Reporter {
 }
 
 /**
- * Instantiated by Playwright from `playwright.config.ts`, never imported by hand; `@public`
- * keeps knip's `includeEntryExports` quiet.
+ * Instantiated by Playwright from playwright.config.ts, never imported by hand. Tagged to keep
+ * knip's includeEntryExports quiet.
  *
  * @public
  */

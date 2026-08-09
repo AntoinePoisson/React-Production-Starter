@@ -2,13 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LOCALE, LOCALES } from '@/i18n/Routing';
 
-/**
- * The route definitions themselves.
- *
- * `createFileRoute` and `createRootRoute` are stubbed to hand back the options object they were
- * given: what is worth asserting is the configuration — which locale a route declares, what it
- * does with an unknown segment — not TanStack's ability to build a route from it.
- */
+// createFileRoute and createRootRoute are stubbed to hand back the options object. What's worth
+// asserting is the config, not TanStack's ability to build a route from it.
 const notFound = vi.fn(() => new Error('notFound'));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -38,8 +33,7 @@ describe('/', () => {
     const head = (indexRoute as RouteOptions).head?.({ params: { locale: '' } });
     const canonical = head?.links.find((link) => link.rel === 'canonical');
 
-    // `/` and `/en` render the same page; `/en` declares `/` as its canonical, so only one of
-    // the two is indexed.
+    // / and /en render the same page, /en canonicals here, so only one gets indexed.
     expect(canonical?.href.endsWith('/')).toBe(true);
     expect(head?.meta.some((tag) => tag.property === 'og:locale')).toBe(true);
   });
@@ -57,8 +51,8 @@ describe('/$locale', () => {
   it('should reject an unknown segment', () => {
     notFound.mockClear();
 
-    // The segment matches anything, so without this `/nonsense` would render the home page under
-    // a canonical claiming to be a language.
+    // The segment matches anything, so without this /nonsense renders the home page under a
+    // canonical claiming to be a language.
     expect(() => (localeRoute as RouteOptions).beforeLoad?.({ params: { locale: 'nonsense' } })).toThrow();
     expect(notFound).toHaveBeenCalled();
   });
@@ -70,7 +64,7 @@ describe('/$locale', () => {
   });
 
   it('should return an empty head for an unknown segment', () => {
-    // `head` runs even for a match `beforeLoad` is about to reject, so it has to tolerate one.
+    // head() runs even for a match beforeLoad is about to reject, so it has to tolerate one.
     const head = (localeRoute as RouteOptions).head?.({ params: { locale: 'nonsense' } });
 
     expect(head).toEqual({});
@@ -80,9 +74,9 @@ describe('/$locale', () => {
     const { readFileSync } = await import('node:fs');
     const viteConfig = readFileSync('vite.config.ts', 'utf-8');
 
-    // `$locale` is a dynamic segment, so no crawl can discover its values — they are listed in
-    // the plugin's `pages`. A locale added to `LOCALES` without a line there compiles, renders
-    // in dev, and is simply missing from the build.
+    // $locale is dynamic, so no crawl discovers its values, they're listed in the plugin's
+    // `pages`. A locale added to LOCALES without a line there compiles, renders in dev, and is
+    // simply absent from the build.
     for (const locale of LOCALES) {
       expect(viteConfig, `/${locale} is not listed for pre-rendering in vite.config.ts`).toContain(`'/${locale}'`);
     }
@@ -93,8 +87,8 @@ describe('/$locale', () => {
 
 describe('/404', () => {
   it('should render the not-found page', () => {
-    // A real route purely so the build emits `dist/client/404.html` — the file every static host
-    // serves for an unknown path.
+    // A real route purely so the build emits 404.html, which is what a static host serves for an
+    // unknown path.
     expect((notFoundRoute as RouteOptions).component).toBeDefined();
   });
 });

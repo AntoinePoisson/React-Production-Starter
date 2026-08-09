@@ -5,8 +5,8 @@ import { withI18n } from '../helpers/withI18n';
 
 const invalidate = vi.fn();
 
-// The router is a mount-time context, and these pages are exactly the ones rendered when it is
-// in an unusual state. Stubbing it keeps each assertion about the page.
+// The router is a mount-time context and these pages are the ones rendered when it's in an
+// unusual state, so stub it and keep each assertion about the page itself.
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate }),
   Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
@@ -31,8 +31,7 @@ describe('ErrorPage', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    // `invalidate()` re-runs the failed match; a reload would destroy the WebGL context and
-    // rebuild it — three.js re-parsed, camera back to its starting position.
+    // invalidate() re-runs the failed match. A reload would destroy the WebGL context.
     expect(invalidate).toHaveBeenCalled();
   });
 
@@ -57,9 +56,8 @@ describe('Loading', () => {
 
 describe('NotFound', () => {
   it('should carry its own title', () => {
-    // A document reached this way never ran a route's `head`, so the tag is rendered inline —
-    // and React 19 hoists it out of the component and into <head>, which is why this looks
-    // there rather than in the render container.
+    // A document reached this way never ran a route's head(), so the tag is rendered inline.
+    // React 19 then hoists it into <head>, which is why we look there and not in the container.
     render(withI18n(<NotFound />));
 
     expect(document.head.querySelector('title')).not.toBeNull();

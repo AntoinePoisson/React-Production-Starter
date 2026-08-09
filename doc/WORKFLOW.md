@@ -1,7 +1,6 @@
-# Workflow Protocol
+# Workflow
 
-> Git workflow, CI/CD, versioning and deployment protocol.
-> Reference documentation for new developers and for LLMs.
+Git workflow, CI/CD, versioning and deployment. Read this before your first push.
 
 ---
 
@@ -54,8 +53,8 @@ CI/CD (.github/workflows/ci.yml)
 | **Version format**   | None    | `vX.Y.Z-pre` | `vX.Y.Z`       |
 
 > **Lint mode.** Strict (`--max-warnings 0`) on `dev`, `devel`, `develop`, `main`, `master` and
-> `prod`; permissive elsewhere. A feature branch is where a scratch `console.log` is allowed to
-> live — it has to be gone before the code reaches `develop`.
+> `prod`, permissive elsewhere. A feature branch is where a scratch `console.log` may live, it
+> just has to be gone before the code reaches `develop`.
 
 ---
 
@@ -102,12 +101,12 @@ Managed by [Lefthook](https://lefthook.dev). All pre-commit hooks run **in paral
 | `build`                          | pre-push   | skip    | run    | run    |
 | `commitlint`                     | commit-msg | run     | run    | run    |
 
-`stage_fixed: true` re-stages only the files the hooks rewrote — never `git add -A`.
+`stage_fixed: true` re-stages only the files the hooks rewrote, never `git add -A`.
 
-**The i18n hook reports; it does not stage.** `lingui extract` reads `src/` from disk, not from
-the index. Staging its output would commit catalogue entries for code that is not in the commit.
-When it fails, the regenerated files are already on disk: review them, fill in the translations,
-`git add`, commit again.
+**The i18n hook reports, it does not stage.** `lingui extract` reads `src/` from disk, not from
+the index, so staging its output would commit catalogue entries for code that isn't in the
+commit. When it fails the regenerated files are already on disk: review them, fill in the
+translations, `git add`, commit again.
 
 ---
 
@@ -126,19 +125,19 @@ When it fails, the regenerated files are already on disk: review them, fill in t
 | `e2e-mobile` (mobile-chrome, mobile-safari)                             | dev+       | 40 min      |
 | `benchmark` + `benchmark-report`                                        | main, prod | 40 / 10 min |
 
-"dev+" means `dev`, `devel`, `develop`, `main`, `master`, `prod` — on push, or on a PR targeting
-one of them.
+"dev+" means `dev`, `devel`, `develop`, `main`, `master`, `prod`, on push or on a PR targeting one
+of them.
 
 ### Deployment conditions
 
-**Deploy runs before release**, always. That ordering is what prevents a "phantom release": a git
-tag pointing at code that was never deployed.
+**Deploy runs before release**, always. That ordering is what stops a git tag from pointing at
+code that was never deployed.
 
 ```yaml
 deploy-sandbox:  if: always() && ref == develop   # deploys even if tests fail
 deploy-preprod:  if: always() && ref == main      # deploys even if tests fail
 release-preprod: if: needs.deploy-preprod.result == 'success'
-deploy-prod:     if: ref == prod                  # no always() — BLOCKS on test failure
+deploy-prod:     if: ref == prod                  # no always(), BLOCKS on test failure
 release-prod:    if: needs.deploy-prod.result == 'success'
 ```
 
@@ -147,21 +146,20 @@ rapid iteration. On `prod`, the absence of `always()` blocks deployment if any t
 
 ### Required repository variables
 
-`VITE_SITE_URL` (**required** — without it every deployed page ships a localhost canonical and a
-`noindex`), `VITE_PROJECT_NAME`, `VITE_MAIN_WEBSITE_NAME`.
+`VITE_SITE_URL` (**required**, without it every deployed page ships a localhost canonical),
+`VITE_PROJECT_NAME`, `VITE_MAIN_WEBSITE_NAME`.
 Settings → Secrets and variables → Actions → Variables.
 
 ---
 
 ## Deployment
 
-**There is none, deliberately.** The three deploy jobs carry the full gating logic and an empty
-step:
+There is none, on purpose. The three deploy jobs carry the full gating logic and an empty step:
 
 ```yaml
 - name: Deploy
   run: |
-    echo "::notice::No deployment provider configured — the site to publish is in ./dist/client"
+    echo "::notice::No deployment provider configured, the site is in ./dist/client"
     # ▼ Your deployment command goes here. ▼
 ```
 
@@ -175,13 +173,13 @@ Publish `dist/client/`. Some examples:
 | S3 / CDN     | `aws s3 sync dist/client s3://bucket --delete`               |
 | Your own box | `rsync -az --delete dist/client/ user@host:/srv/site/`       |
 
-Two things the build guarantees, whatever you pick:
+Two things the build guarantees whatever you pick:
 
-- **`404.html` at the root** — what every static host serves for an unknown path.
-- **Content-hashed filenames under `static/`** — safe to cache immutably. Everything under
+- **`404.html` at the root**, what every static host serves for an unknown path.
+- **Content-hashed filenames under `static/`**, safe to cache immutably. Everything under
   `assets/` is verbatim and must not be.
 
-Keep the deploy step exiting non-zero on failure: that is what stops the release job.
+Keep the deploy step exiting non-zero on failure, that is what stops the release job.
 
 ---
 
@@ -234,9 +232,9 @@ changelog; and offers to drop the 3D demo and reinitialise git.
 
 Then check what it could not know:
 
-- [ ] `src/utils/config/Identity.ts` — `TWITTER_HANDLE` is empty by design; set it only if you
-      own the account
-- [ ] `src/app/globals.css` — the `@theme static` palette
+- [ ] `src/utils/config/Identity.ts`, `TWITTER_HANDLE` is empty by design, set it only if you own
+      the account
+- [ ] `src/app/globals.css`, the `@theme static` palette
 - [ ] UI copy in the components, then `pnpm i18n` and translate `src/i18n/messages/fr.json`
 
 ### 2. Artwork
@@ -249,14 +247,14 @@ pnpm assets:brand
 ```
 
 That regenerates the favicon, the apple touch icon, both `any` sizes, both `maskable` sizes and
-the 1200×630 OG image. Check any replacement against <https://maskable.app>.
+the 1200x630 OG image. Check any replacement against <https://maskable.app>.
 
 ### 3. Git & GitHub
 
 - [ ] Point `origin` at the new repository
 - [ ] Create `develop`, `main`, `prod`
 - [ ] Configure branch protection; set `prod` as the production branch
-- [ ] Add the `VITE_SITE_URL` repository variable — **without it every page ships a localhost canonical**
+- [ ] Add the `VITE_SITE_URL` repository variable. **Without it every page ships a localhost canonical.**
 
 ### 4. Deployment
 
@@ -272,8 +270,3 @@ the 1200×630 OG image. Check any replacement against <https://maskable.app>.
 - [ ] Push to `develop` (CI green, deploy job succeeds as a no-op)
 - [ ] Merge `develop` → `main` (should create a `-pre` release)
 - [ ] Merge `main` → `prod` (should create a stable release)
-
----
-
-_Reference document for this template. Adapt it when the pipeline changes — a workflow doc that
-lies is worse than no workflow doc._

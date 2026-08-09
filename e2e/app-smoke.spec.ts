@@ -2,9 +2,8 @@ import { expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// Browser and dev-server console noise to ignore.
-// `hydration`/`Hydration` are not noise: React's dev build reports real mismatches under that
-// wording, and the local run is against `vite dev`. Drop them once the suite is quiet enough.
+// Browser and dev-server noise. hydration/Hydration are NOT noise: React's dev build reports
+// real mismatches under that wording. Drop them once the suite is quiet enough locally.
 const IGNORED_ERROR_PATTERNS = [
   'DevTools',
   'Extension',
@@ -17,9 +16,8 @@ const IGNORED_ERROR_PATTERNS = [
   'hot-reloader'
 ];
 
-// What three.js logs when it cannot get a WebGL context. Dropped only when the scene failed to
-// boot AND the engine is one whose headless WebGL is undependable (firefox, webkit on a Linux
-// runner); on chromium and mobile-chrome a scene that does not boot is a defect.
+// What three.js logs when it can't get a context. Only dropped when the scene failed to boot AND
+// the engine is one whose headless WebGL is undependable (firefox, webkit on a Linux runner).
 const WEBGL_UNAVAILABLE_PATTERNS = ['A WebGL context could not be created', 'Error creating WebGL context'];
 
 function filterConsoleErrors(errors: string[]): string[] {

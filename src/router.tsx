@@ -2,7 +2,7 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 
 import { routeTree } from './routeTree.gen';
 
-/** `routeTree.gen.ts` is generated from `src/routes/` by the TanStack plugin, and git-ignored. */
+// routeTree.gen.ts is generated from src/routes/ by the TanStack plugin, and gitignored.
 export function getRouter() {
   return createTanStackRouter({
     routeTree,

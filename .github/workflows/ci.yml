@@ -2,20 +2,18 @@ name: CI/CD Pipeline
 
 on: [push, pull_request]
 
-# Read-only by default; jobs that need more widen it themselves.
+# Read-only by default, jobs that need more widen it themselves.
 permissions:
   contents: read
 
-# Cancel superseded runs. A PR and the push that triggered it land in separate groups on
-# purpose — collapsing them lets the PR run cancel the push run, which is the one that deploys.
+# A PR and the push that triggered it land in separate groups on purpose. Collapsing them lets
+# the PR run cancel the push run, which is the one that deploys.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ============================================
-  # LINT
-  # ============================================
+  # --- LINT ---
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -25,7 +23,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      # No `version:` — the action reads `packageManager` from package.json, the only pin.
+      # No version: here, the action reads packageManager from package.json.
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -39,13 +37,12 @@ jobs:
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
       - if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-      # Unconditional, unlike the install: the compiled catalogues are git-ignored and only the
-      # `prepare` script writes them — which never runs on a cache hit. Without this, the first
-      # warm cache fails with `Cannot find module './messages/en'`.
+      # Unconditional, unlike the install above. The compiled catalogues are gitignored and only
+      # the `prepare` script writes them, which never runs on a cache hit. Without this the first
+      # warm cache fails with "Cannot find module './messages/en'".
       - run: pnpm exec lingui compile
-      # Same reason, different generator: the route tree is git-ignored and written by the
-      # TanStack plugin on dev and build. `import-x/no-unresolved` reads `./routeTree.gen` off
-      # disk, so without this the lint fails on src/router.tsx alone.
+      # Same idea for the route tree. import-x/no-unresolved reads ./routeTree.gen off disk, so
+      # without this the lint fails on src/router.tsx alone.
       - run: pnpm run generate-routes
       - name: Run linter
         run: |
@@ -54,9 +51,7 @@ jobs:
             *) echo "Permissive lint on ${{ github.ref_name }}"; pnpm run lint:permissive ;;
           esac
 
-  # ============================================
-  # TYPECHECK
-  # ============================================
+  # --- TYPECHECK ---
   typecheck:
     name: TypeScript Type Check
     runs-on: ubuntu-latest
@@ -80,14 +75,12 @@ jobs:
       - if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
       - run: pnpm exec lingui compile
-      # The route tree is generated on dev and build, and git-ignored — but `tsc` needs the file
-      # to exist, and this job runs neither.
+      # The route tree is generated on dev and build, and gitignored, but tsc needs the file
+      # to exist and this job runs neither.
       - run: pnpm run generate-routes
       - run: pnpm run typecheck
 
-  # ============================================
-  # SECURITY AUDIT
-  # ============================================
+  # --- SECURITY AUDIT ---
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -112,9 +105,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - run: pnpm run audit
 
-  # ============================================
-  # SECRETS DETECTION
-  # ============================================
+  # --- SECRETS DETECTION ---
   secrets-check:
     name: Secrets Detection
     runs-on: ubuntu-latest
@@ -128,9 +119,7 @@ jobs:
       # staged diff is empty and the job would pass without inspecting a byte.
       - run: node scripts/check-secrets.mjs --all
 
-  # ============================================
-  # UNIT TESTS
-  # ============================================
+  # --- UNIT TESTS ---
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -153,9 +142,9 @@ jobs:
           key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
       - if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-      # `pnpm run test` compiles the catalogues itself, but nothing here writes the route tree —
-      # and Vite has to resolve `./routeTree.gen` to transform src/router.tsx at all. Mocking it
-      # in tests/router.test.ts is not enough: the failure happens before the mock applies.
+      # `pnpm run test` compiles the catalogues itself, but nothing here writes the route tree,
+      # and Vite has to resolve ./routeTree.gen to transform src/router.tsx at all. Mocking it
+      # in tests/router.test.ts is not enough, the failure happens before the mock applies.
       - run: pnpm run generate-routes
       - run: pnpm run test
       - name: Upload coverage
@@ -166,9 +155,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # ============================================
-  # BUILD
-  # ============================================
+  # --- BUILD ---
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -199,16 +186,14 @@ jobs:
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
           VITE_PROJECT_NAME: ${{ vars.VITE_PROJECT_NAME }}
           VITE_MAIN_WEBSITE_NAME: ${{ vars.VITE_MAIN_WEBSITE_NAME }}
-      # `dist/client` only — `dist/server` is the render pass, never deployed.
+      # dist/client only, dist/server is the render pass and is never deployed.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-directory
           path: dist/client/
           retention-days: 7
 
-  # ============================================
-  # SIZE LIMIT
-  # ============================================
+  # --- SIZE LIMIT ---
   size-limit:
     name: Bundle Size Check
     needs: [build]
@@ -238,9 +223,7 @@ jobs:
           path: dist/client/
       - run: pnpm run size
 
-  # ============================================
-  # STORYBOOK — catches a story that no longer compiles
-  # ============================================
+  # --- STORYBOOK - catches a story that no longer compiles ---
   storybook:
     name: Storybook Build
     runs-on: ubuntu-latest
@@ -266,9 +249,7 @@ jobs:
       - run: pnpm exec lingui compile
       - run: pnpm run build:storybook
 
-  # ============================================
-  # NODE COMPATIBILITY — non-blocking
-  # ============================================
+  # --- NODE COMPATIBILITY - non-blocking ---
   node-compat:
     name: Compatibility Latest Nodejs
     runs-on: ubuntu-latest
@@ -285,9 +266,7 @@ jobs:
         env:
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
 
-  # ============================================
-  # E2E DESKTOP — 3 browsers × 4 shards
-  # ============================================
+  # --- E2E DESKTOP - 3 browsers x 4 shards ---
   e2e-test:
     name: E2E (${{ matrix.browser }} - shard ${{ matrix.shard }})
     if: |
@@ -296,7 +275,7 @@ jobs:
     needs: [lint, typecheck, security-audit, secrets-check, test-unit, build]
     runs-on: ubuntu-latest
     # Above playwright.config.ts's own 30-minute globalTimeout, so an overrun is ended by
-    # Playwright — which writes a report naming the slow tests.
+    # Playwright, which writes a report naming the slow tests.
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -346,9 +325,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # ============================================
-  # E2E MOBILE
-  # ============================================
+  # --- E2E MOBILE ---
   # Kept out of the sharded desktop matrix: a Pixel 5 and an iPhone 14 run at a device pixel
   # ratio of 2, roughly 8 Mpx a frame in software against ~2 for chromium.
   e2e-mobile:
@@ -410,9 +387,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # ============================================
-  # BENCHMARK — main / prod only
-  # ============================================
+  # --- BENCHMARK - main / prod only ---
   benchmark:
     name: Benchmark Execution
     if: |
@@ -465,9 +440,7 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-  # ============================================
-  # BENCHMARK REPORT — history lives in the Actions cache, so this works on a private repo
-  # ============================================
+  # --- BENCHMARK REPORT - history lives in the Actions cache, so this works on a private repo ---
   benchmark-report:
     name: Benchmark Report
     needs: [benchmark]
@@ -522,28 +495,23 @@ jobs:
           path: .cache/benchmark
           key: benchmark-data-${{ github.ref_name }}-${{ github.run_id }}
 
-  # ╔══════════════════════════════════════════════════════════════════════════╗
-  # ║  DEPLOYMENT — deliberately empty                                         ║
-  # ║                                                                          ║
-  # ║  No host is prescribed. The three jobs below carry the gating logic and  ║
-  # ║  hand you a dist/client/ to publish; the publishing step is yours.       ║
-  # ║                                                                          ║
-  # ║  Keep the ordering: deploy runs BEFORE release, so no tag can point at   ║
-  # ║  code that was never deployed. A deploy step that exits non-zero stops   ║
-  # ║  the matching release job, which is intended.                            ║
-  # ║                                                                          ║
-  # ║    · GitHub Pages   actions/deploy-pages                                 ║
-  # ║    · Netlify        netlify deploy --dir=dist/client --prod              ║
-  # ║    · S3 / CDN       aws s3 sync dist/client s3://… --delete              ║
-  # ║    · Your own box   rsync -az --delete dist/client/ user@host:/srv/…     ║
-  # ╚══════════════════════════════════════════════════════════════════════════╝
+  # --- DEPLOYMENT ---
+  #
+  # No host is prescribed. The three jobs below carry the gating logic and hand you a
+  # dist/client/ to publish, the publishing step itself is yours to fill in.
+  #
+  # Keep the ordering: deploy runs BEFORE release, so no tag can point at code that was never
+  # deployed. A deploy step exiting non-zero stops the matching release job, which is intended.
+  #
+  #   GitHub Pages   actions/deploy-pages
+  #   Netlify        netlify deploy --dir=dist/client --prod
+  #   S3 / CDN       aws s3 sync dist/client s3://... --delete
+  #   Your own box   rsync -az --delete dist/client/ user@host:/srv/...
 
-  # ============================================
-  # DEPLOY SANDBOX — develop, always (even if tests fail)
-  # ============================================
+  # --- DEPLOY SANDBOX - develop, always (even if tests fail) ---
   deploy-sandbox:
     name: Deploy Sandbox
-    # INTENTIONAL: `always()` deploys even when tests fail — the sandbox is for iteration.
+    # always() on purpose, the sandbox is for iteration.
     if: always() && github.ref == 'refs/heads/develop' && github.event_name == 'push'
     needs: [e2e-test, e2e-mobile]
     runs-on: ubuntu-latest
@@ -556,13 +524,11 @@ jobs:
           path: dist/client/
       - name: Deploy
         run: |
-          echo "::notice::No deployment provider configured — the site is in ./dist/client"
+          echo "::notice::No deployment provider configured, the site is in ./dist/client"
           ls -la dist/client
           # ▼ Your deployment command goes here. ▼
 
-  # ============================================
-  # DEPLOY PREPROD — main, always; release only if the deploy succeeded
-  # ============================================
+  # --- DEPLOY PREPROD - main, always. Release only if the deploy succeeded ---
   deploy-preprod:
     name: Deploy Preprod
     if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -577,7 +543,7 @@ jobs:
           path: dist/client/
       - name: Deploy
         run: |
-          echo "::notice::No deployment provider configured — the site is in ./dist/client"
+          echo "::notice::No deployment provider configured, the site is in ./dist/client"
           ls -la dist/client
           # ▼ Your deployment command goes here. ▼
 
@@ -602,9 +568,7 @@ jobs:
           manifest-file: .release-please-manifest-preprod.json
           target-branch: main
 
-  # ============================================
-  # DEPLOY PROD — prod, only if every test passed
-  # ============================================
+  # --- DEPLOY PROD - prod, only if every test passed ---
   deploy-prod:
     name: Deploy Production
     # No `always()` here: a test failure blocks the deployment.
@@ -620,7 +584,7 @@ jobs:
           path: dist/client/
       - name: Deploy
         run: |
-          echo "::notice::No deployment provider configured — the site is in ./dist/client"
+          echo "::notice::No deployment provider configured, the site is in ./dist/client"
           ls -la dist/client
           # ▼ Your deployment command goes here. ▼
 

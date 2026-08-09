@@ -9,16 +9,15 @@ import FloatingShapes from './demo/FloatingShapes';
 import Environment from './environment/Environment';
 
 /**
- * Scene orchestrator: everything rendered inside the <Canvas>. `scene/demo` is placeholder content;
- * delete it and keep this file's shape for an empty stage. Client boundary for the whole scene graph,
- * so the DOM overlay stays outside it and paints before the 3D bundle arrives.
+ * Everything rendered inside the <Canvas>. scene/demo is placeholder content, delete it and keep
+ * this file's shape for an empty stage.
  */
 export default function Experiences() {
   return (
     <>
       <Environment />
 
-      {/* Pair both around any asset load: Suspense covers a slow fetch, the boundary a failed one. */}
+      {/* Both, around any asset load. Suspense covers a slow fetch, the boundary a failed one. */}
       <SceneErrorBoundary>
         <Suspense fallback={<InsideCanvasLoader />}>
           <DemoModel />

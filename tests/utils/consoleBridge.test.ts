@@ -1,8 +1,6 @@
 /* eslint-disable no-console -- this suite patches and restores console itself, so it has
    to call the very methods the rule is there to discourage. */
 
-/** Unit tests for the console bridge. The properties that matter: no recursion, clean restore. */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { installConsoleBridge, uninstallConsoleBridge } from '@/utils/logger/ConsoleBridge';

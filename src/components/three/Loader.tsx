@@ -9,7 +9,6 @@ const useProgressLabel = (): string => {
   return t`${percent}% loaded`;
 };
 
-/** Loader rendered *inside* the canvas (3D space) — use it in a <Suspense> within the scene. */
 export function InsideCanvasLoader() {
   return (
     <Html center>
@@ -19,10 +18,10 @@ export function InsideCanvasLoader() {
 }
 
 /**
- * Loader rendered *instead of* the canvas — the fallback while the scene's own chunk arrives.
+ * Rendered instead of the canvas, while the scene's own chunk arrives.
  *
- * Only ever import this from inside the lazily loaded canvas, where drei is already paid for.
- * From the document shell, use `components/ui/BootLoader.tsx`.
+ * Only import this from inside the lazy canvas, where drei is already paid for. The shell uses
+ * ui/BootLoader.tsx instead.
  */
 export default function CanvasLoader() {
   return (

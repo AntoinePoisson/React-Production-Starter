@@ -5,17 +5,17 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 /**
- * Deliberately standalone rather than `mergeConfig(viteConfig, …)`: the TanStack Start plugin
- * owns the pre-render pass, the server build and the route-tree generation, none of which a unit
- * test wants. What the tests do need from the app build is the Babel pass.
+ * Standalone rather than mergeConfig(viteConfig, ...). The TanStack Start plugin owns the
+ * prerender pass, the server build and the route-tree generation, none of which a unit test
+ * wants. The Babel pass is the only thing the tests need from the app build.
  */
 export default defineConfig({
   plugins: [
     react(),
-    // Lingui macros only. No `reactCompilerPreset()` here: the compiler changes when memoised
-    // values are recomputed, never what a component renders, so running it would slow the suite
-    // down to assert nothing extra. `<Trans>` on the other hand is syntax — without this every
-    // translated component throws "executed outside the context of compilation" on render.
+    // Lingui macros only. No reactCompilerPreset(): it changes when memoised values are
+    // recomputed, never what a component renders, so it would just slow the suite down.
+    // <Trans> is syntax though, without this every translated component throws
+    // "executed outside the context of compilation" on render.
     babel({ plugins: ['@lingui/babel-plugin-lingui-macro'] })
   ],
   test: {
@@ -23,9 +23,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    // 100% is enforced on `src/` — `pnpm test` fails below it. The exclusions are the two things
-    // that are not the template's own machinery: `src/scene/demo/` is placeholder content meant
-    // to be deleted on day one, and `routeTree.gen.ts` is generated from the file tree.
+    // 100% enforced on src/, the run fails below it. The exclusions are the things that aren't
+    // the template's own code: scene/demo is placeholder content, routeTree.gen.ts is generated.
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

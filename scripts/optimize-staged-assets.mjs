@@ -1,20 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Optimises the assets in the staged diff — the pre-commit half of `optimize-assets.mjs`, which
- * walks the whole of `public/assets/` instead.
+ * Pre-commit half of optimize-assets.mjs, scoped to the staged diff instead of the whole of
+ * public/assets/. Re-encoding every texture in the project on each commit costs seconds nobody
+ * asked to spend and touches files the commit says nothing about.
  *
- * Scoped to what is staged for the same reason the whole hook is scoped to development branches:
- * re-encoding every texture in the project on every commit costs seconds nobody asked to spend,
- * and touches files the commit says nothing about.
- *
- * It reports rather than stages, like the i18n hook. `optimize-assets.mjs` keeps a `.original.{ext}`
- * copy of every file it rewrites, those copies are not git-ignored, and a Draco pass is lossy —
- * quantisation is not something to discover in a diff of a binary. So a run that rewrote anything
- * fails the commit: look at the result, delete the backups you are happy with, restore the ones you
- * are not, and stage the assets yourself.
- *
- * Usage: node scripts/optimize-staged-assets.mjs
+ * Reports rather than stages, like the i18n hook. optimize-assets.mjs keeps a .original.{ext}
+ * copy of everything it rewrites, those copies aren't gitignored, and a Draco pass is lossy.
+ * So a run that rewrote anything fails the commit: check the result, delete the backups you're
+ * happy with, restore the ones you aren't, then stage the assets yourself.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -36,11 +30,11 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf-8' });
 
 const PROJECT_ROOT = git('rev-parse', '--show-toplevel').trim();
 
-// Repository-relative, which is what `git diff` speaks: the hook's working directory is not
-// something this script gets to assume.
+// Repo-relative, which is what git diff speaks. The hook's working directory isn't something
+// this script gets to assume.
 const ASSETS_PREFIX = `${path.relative(PROJECT_ROOT, CONFIG.assetsDir).split(path.sep).join('/')}/`;
 
-/** The backup `optimize-assets.mjs` writes beside a file before rewriting it. */
+/** The backup optimize-assets.mjs writes beside a file before rewriting it. */
 const backupPathFor = (filePath) => {
   const extension = path.extname(filePath);
 
@@ -48,11 +42,11 @@ const backupPathFor = (filePath) => {
 };
 
 /**
- * Staged paths, added/copied/modified only. A deletion has nothing left to optimise, and a
- * rename reaches this list as its destination.
+ * Added/copied/modified only. A deletion has nothing left to optimise and a rename reaches this
+ * list as its destination.
  *
- * `-z` and a NUL split rather than lines: `git diff --name-only` quotes and escapes any path
- * holding a space or a non-ASCII byte, and an asset named `dépliant final.png` is not exotic.
+ * -z and a NUL split rather than lines: git diff --name-only quotes and escapes any path holding
+ * a space or a non-ASCII byte, and an asset called `dépliant final.png` isn't exotic.
  */
 const stagedFiles = () => git('diff', '--cached', '--name-only', '--diff-filter=ACM', '-z').split('\0').filter(Boolean);
 
@@ -60,8 +54,7 @@ const isOptimisable = (relativePath) => {
   if (!relativePath.startsWith(ASSETS_PREFIX)) return false;
 
   const name = path.basename(relativePath);
-  // A backup is not an input. Feeding one back in would optimise the copy kept to undo the
-  // optimisation.
+  // A backup isn't an input. Feeding one back in optimises the copy kept to undo the optimisation.
   if (name.includes('.original.')) return false;
 
   const extension = path.extname(name).toLowerCase();
@@ -72,8 +65,8 @@ const isOptimisable = (relativePath) => {
 async function main() {
   const staged = stagedFiles();
 
-  // Committing a backup is the very thing the failure below exists to prevent, so a staged one is
-  // rejected whoever created it — this run, or a `pnpm optimize-assets` earlier in the afternoon.
+  // A staged backup gets rejected whoever created it: this run, or a `pnpm optimize-assets` from
+  // earlier in the day.
   const stagedBackups = staged.filter((file) => path.basename(file).includes('.original.'));
 
   const targets = staged.filter(isOptimisable);
@@ -89,7 +82,7 @@ async function main() {
   for (const relativePath of targets) {
     const fullPath = path.join(PROJECT_ROOT, relativePath);
 
-    // Staged, but gone from the working tree — `optimize-assets.mjs` reads the disk, not the index.
+    // Staged but gone from the working tree. optimize-assets.mjs reads disk, not the index.
     if (!existsSync(fullPath)) continue;
 
     console.info(`\n${colors.blue}→${colors.reset} ${relativePath}`);
@@ -99,7 +92,7 @@ async function main() {
       ? await optimizeModel(fullPath)
       : await optimizeImage(fullPath);
 
-    // Anything else left no backup behind: a skip discards the copy it took, and a failed encode
+    // Anything else left no backup behind: a skip discards the copy it took, a failed encode
     // restores from it and then discards it.
     if (!result.skipped && !result.error) rewritten.push(relativePath);
   }
@@ -113,7 +106,7 @@ async function main() {
   console.error('');
 
   if (rewritten.length > 0) {
-    console.error(`${colors.red}❌ Staged assets were rewritten — review them before committing.${colors.reset}`);
+    console.error(`${colors.red}❌ Staged assets were rewritten. Review them before committing.${colors.reset}`);
     console.error('');
     console.error(`   ${colors.bright}Optimized in place, with the original kept beside it:${colors.reset}`);
     for (const file of rewritten) {

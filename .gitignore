@@ -22,7 +22,7 @@ src/i18n/messages/*.ts
 src/routeTree.gen.ts
 *.tsbuildinfo
 
-# env — only the example is committed
+# env, only the example is committed
 .env*
 !.env.example
 

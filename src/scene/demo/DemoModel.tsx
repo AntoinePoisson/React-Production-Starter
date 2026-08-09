@@ -7,11 +7,11 @@ import type { GLTF } from 'three-stdlib';
 import { sceneColor } from '@/utils/theme/Palette';
 
 /**
- * Placeholder model, replace with your own asset. The demo GLB ships uncompressed: 92 kB, 11 kB
- * under Draco, against a 245 kB decoder. Break-even is around a megabyte of geometry; the wired
- * decoder path only loads when a model actually carries Draco data.
+ * Placeholder, swap in your own asset. This GLB ships uncompressed: 92 kB against a 245 kB Draco
+ * decoder, so it isn't worth it under about a megabyte of geometry. The decoder path is wired
+ * anyway and only loads for a model that carries Draco data.
  *
- * npx gltfjsx@latest --transform --types --debug ./public/assets/models/<model>.glb
+ * Types: npx gltfjsx@latest --transform --types --debug ./public/assets/models/<model>.glb
  */
 type GLTFResult = GLTF & {
   nodes: { DemoShape: Mesh };

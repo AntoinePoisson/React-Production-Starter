@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { TEMPLATE, applyReplacements, buildReplacements, toOrigin, toSlug, toTitle } from '../../initialize.js';
 
 /**
- * The rename rules behind `node initialize.js`.
- *
- * The script's transformations are exported precisely so they can be asserted without a
- * temporary directory — a rename that half-applies leaves a repository naming itself two
- * different things, and the failure surfaces weeks later in a storage key or an og:title.
+ * The rename rules are exported so they can be asserted without a temp directory. A rename that
+ * half-applies leaves a repo naming itself two different things, and that only surfaces weeks
+ * later in a storage key or an og:title.
  */
 describe('toSlug', () => {
   it.each([
@@ -18,8 +16,8 @@ describe('toSlug', () => {
     ['Weird!!Chars@@Here', 'weird-chars-here'],
     ['--leading-and-trailing--', 'leading-and-trailing']
   ])('should turn %j into %j', (input, expected) => {
-    // A package name may only hold [a-z0-9-._~], so diacritics have to be folded rather than
-    // dropped — "Café" becoming "caf" would be worse than either.
+    // A package name may only hold [a-z0-9-._~], so diacritics get folded and not dropped.
+    // "Café" becoming "caf" would be worse than either.
     expect(toSlug(input)).toBe(expected);
   });
 });
@@ -31,7 +29,7 @@ describe('toTitle', () => {
     ['my_great_app', 'My Great App'],
     ['iOS Companion', 'iOS Companion']
   ])('should turn %j into %j', (input, expected) => {
-    // A word that already carries capitals keeps them: "iOS" must not become "Ios".
+    // A word that already carries capitals keeps them, "iOS" must not become "Ios".
     expect(toTitle(input)).toBe(expected);
   });
 });
@@ -47,8 +45,8 @@ describe('toOrigin', () => {
   });
 
   it.each(['', 'not a url', '://'])('should return an empty string for %j', (input) => {
-    // An empty origin is a valid answer — it means "not decided yet", and the SEO files already
-    // fail closed on one. Throwing here would abort the whole rename over an optional field.
+    // An empty origin means "not decided yet", and the SEO files already fail closed on one.
+    // Throwing here would abort the whole rename over an optional field.
     expect(toOrigin(input)).toBe('');
   });
 });
@@ -65,9 +63,8 @@ describe('buildReplacements', () => {
   it('should order the pairs longest-first', () => {
     const lengths = buildReplacements(answers).map(([from]) => from.length);
 
-    // The ordering is the whole reason this is a list. "react-app-fondation" is a substring of
-    // nothing, but "React App Fondation" contains words the shorter rules would otherwise chew
-    // through first, leaving a half-rewritten string no later rule matches.
+    // The ordering is the whole reason this is a list. "React App Fondation" contains words the
+    // shorter rules would chew through first, leaving a string no later rule matches.
     expect(lengths).toEqual([...lengths].sort((a, b) => b - a));
   });
 
@@ -84,9 +81,8 @@ describe('buildReplacements', () => {
   it('should quote the namespace so it only matches a whole value', () => {
     const sources = buildReplacements(answers).map(([from]) => from);
 
-    // The template namespace is `app`, which also appears inside `react-app-fondation`,
-    // `src/app/` and a hundred other places. Only the quoted form is a value, so that is the
-    // only form the rename is allowed to match.
+    // The namespace is `app`, which also appears in react-app-fondation, src/app/ and a hundred
+    // other places. Only the quoted form is a value, so that's the only form we may match.
     expect(sources).toContain(`"${TEMPLATE.namespace}"`);
     expect(sources).not.toContain(TEMPLATE.namespace);
   });
@@ -102,10 +98,10 @@ describe('applyReplacements', () => {
       namespace: 'app'
     });
 
-    const before = `${TEMPLATE.title} — see ${TEMPLATE.slug}. ${TEMPLATE.title} again.`;
+    const before = `${TEMPLATE.title}, see ${TEMPLATE.slug}. ${TEMPLATE.title} again.`;
     const after = applyReplacements(before, replacements);
 
-    expect(after).toBe('My Great App — see my-great-app. My Great App again.');
+    expect(after).toBe('My Great App, see my-great-app. My Great App again.');
     expect(after).not.toContain(TEMPLATE.title);
     expect(after).not.toContain(TEMPLATE.slug);
   });

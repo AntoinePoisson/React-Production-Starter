@@ -1,5 +1,3 @@
-/** Unit tests for field Web Vitals reporting. */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handlers = vi.hoisted(() => ({
