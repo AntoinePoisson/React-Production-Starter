@@ -1,0 +1,83 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import { withI18n } from '../helpers/withI18n';
+
+const invalidate = vi.fn();
+
+// The router is a mount-time context and these pages are the ones rendered when it's in an
+// unusual state, so stub it and keep each assertion about the page itself.
+vi.mock('@tanstack/react-router', () => ({
+  useRouter: () => ({ invalidate }),
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
+    <a
+      href={to}
+      {...props}
+    >
+      {children}
+    </a>
+  )
+}));
+
+const { default: ErrorPage } = await import('@/app/pages/ErrorPage');
+const { default: Loading } = await import('@/app/pages/Loading');
+const { default: NotFound } = await import('@/app/pages/NotFound');
+
+describe('ErrorPage', () => {
+  it('should offer a way out', () => {
+    render(withI18n(<ErrorPage error={new Error('boom')} />));
+
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button'));
+
+    // invalidate() re-runs the failed match. A reload would destroy the WebGL context.
+    expect(invalidate).toHaveBeenCalled();
+  });
+
+  it('should translate its copy', () => {
+    const { unmount } = render(withI18n(<ErrorPage error={new Error('boom')} />, 'en'));
+    const english = screen.getByRole('heading', { level: 1 }).textContent;
+    unmount();
+
+    render(withI18n(<ErrorPage error={new Error('boom')} />, 'fr'));
+
+    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe(english);
+  });
+});
+
+describe('Loading', () => {
+  it('should render translated copy', () => {
+    render(withI18n(<Loading />, 'fr'));
+
+    expect(screen.getByText('Chargement…')).toBeInTheDocument();
+  });
+});
+
+describe('NotFound', () => {
+  it('should carry its own title', () => {
+    // A document reached this way never ran a route's head(), so the tag is rendered inline.
+    // React 19 then hoists it into <head>, which is why we look there and not in the container.
+    render(withI18n(<NotFound />));
+
+    expect(document.head.querySelector('title')).not.toBeNull();
+  });
+
+  it('should link back to the home page', () => {
+    render(withI18n(<NotFound />));
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/');
+  });
+
+  it('should keep the error page out of search results', () => {
+    render(withI18n(<NotFound />));
+
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
+  });
+
+  it('should translate its copy', () => {
+    render(withI18n(<NotFound />, 'fr'));
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Page introuvable');
+  });
+});
