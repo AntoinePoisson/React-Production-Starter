@@ -1,0 +1,641 @@
+name: CI/CD Pipeline
+
+on: [push, pull_request]
+
+# Read-only by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
+# PR and the matching push stay in seperate groups. Merge them and the
+# PR run cancels the push — that's the one that deploys.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+# GH Pages project sites live under /<repo>. Default here so a missing
+# repo variable doesn't bake localhost URLs into the build.
+env:
+  VITE_SITE_URL: ${{ vars.VITE_SITE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+
+jobs:
+  # --- LINT ---
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Picks the version from package.json (packageManager field).
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      # Catalogues are gitignored; `prepare` writes them but doesn't run on a cache hit.
+      # First warm cache otherwise dies with "Cannot find module './messages/en'".
+      - run: pnpm exec lingui compile
+      # Same for the route tree — lint reads it off disk.
+      - run: pnpm run generate-routes
+      - name: Run linter
+        run: |
+          case "${{ github.ref_name }}" in
+            main|master|dev|devel|develop|prod) pnpm run lint ;;
+            *) echo "Permissive lint on ${{ github.ref_name }}"; pnpm run lint:permissive ;;
+          esac
+
+  # --- TYPECHECK ---
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - run: pnpm exec lingui compile
+      # gitignored, generated on dev/build. This job does neither.
+      - run: pnpm run generate-routes
+      - run: pnpm run typecheck
+
+  # --- SECURITY AUDIT ---
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - run: pnpm run audit
+
+  # --- SECRETS DETECTION ---
+  secrets-check:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # --all, not staged: after checkout the index == HEAD, so staged mode would scan nothing.
+      - run: node scripts/check-secrets.mjs --all
+
+  # --- UNIT TESTS ---
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      # test compiles catalogues, but Vite still needs routeTree.gen on disk to even
+      # transform router.tsx. Mocking it in the test is too late.
+      - run: pnpm run generate-routes
+      - run: pnpm run test
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # --- BUILD ---
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm run build
+        env:
+          # Baked in at build time. Without VITE_SITE_URL every page ships a localhost canonical.
+          VITE_PROJECT_NAME: ${{ vars.VITE_PROJECT_NAME }}
+          VITE_MAIN_WEBSITE_NAME: ${{ vars.VITE_MAIN_WEBSITE_NAME }}
+      # client only — dist/server is just the render pass.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+          retention-days: 7
+
+  # --- SIZE LIMIT ---
+  size-limit:
+    name: Bundle Size Check
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      - run: pnpm run size
+
+  # --- STORYBOOK ---
+  storybook:
+    name: Storybook Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - run: pnpm exec lingui compile
+      - run: pnpm run build:storybook
+
+  # --- NODE COMPATIBILITY - non-blocking ---
+  node-compat:
+    name: Compatibility Latest Nodejs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: latest
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm run build
+
+  # --- E2E DESKTOP - 3 browsers x 4 shards ---
+  e2e-test:
+    name: E2E (${{ matrix.browser }} - shard ${{ matrix.shard }})
+    if: |
+      (github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'devel' || github.ref_name == 'develop' || github.ref_name == 'main' || github.ref_name == 'master' || github.ref_name == 'prod')) ||
+      (github.event_name == 'pull_request' && (github.base_ref == 'dev' || github.base_ref == 'devel' || github.base_ref == 'develop' || github.base_ref == 'main' || github.base_ref == 'master' || github.base_ref == 'prod'))
+    needs: [lint, typecheck, security-audit, secrets-check, test-unit, build]
+    runs-on: ubuntu-latest
+    # Higher than Playwright's 30min globalTimeout so PW can finish and name the slow tests.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ matrix.browser }}
+          restore-keys: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps ${{ matrix.browser }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      # `serve` mounts at /, GH Pages lives under /<repo>. Stage the build under that
+      # path so the specs hit the URLs the build actually emits. 404.html also goes
+      # at the server root — that's where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
+      - run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4
+        env:
+          CI: true
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results-${{ matrix.browser }}-shard-${{ matrix.shard }}
+          path: reports/artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # --- E2E MOBILE ---
+  # Out of the desktop matrix: Pixel 5 / iPhone 14 at DPR 2 is a lot more pixels in software.
+  e2e-mobile:
+    name: E2E (${{ matrix.project }})
+    if: |
+      (github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'devel' || github.ref_name == 'develop' || github.ref_name == 'main' || github.ref_name == 'master' || github.ref_name == 'prod')) ||
+      (github.event_name == 'pull_request' && (github.base_ref == 'dev' || github.base_ref == 'devel' || github.base_ref == 'develop' || github.base_ref == 'main' || github.base_ref == 'master' || github.base_ref == 'prod'))
+    needs: [lint, typecheck, security-audit, secrets-check, test-unit, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: mobile-chrome
+            engine: chromium
+          - project: mobile-safari
+            engine: webkit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ matrix.engine }}
+          restore-keys: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps ${{ matrix.engine }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      # `serve` mounts at /, GH Pages lives under /<repo>. Stage the build under that
+      # path so the specs hit the URLs the build actually emits. 404.html also goes
+      # at the server root — that's where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
+      - run: pnpm exec playwright test --project=${{ matrix.project }}
+        env:
+          CI: true
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results-${{ matrix.project }}
+          path: reports/artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # --- BENCHMARK - main / prod only ---
+  benchmark:
+    name: Benchmark Execution
+    if: |
+      (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master' || github.ref_name == 'prod')) ||
+      (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'master' || github.base_ref == 'prod'))
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-chromium
+          restore-keys: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}-
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      # `serve` mounts at /, GH Pages lives under /<repo>. Stage the build under that
+      # path so the specs hit the URLs the build actually emits. 404.html also goes
+      # at the server root — that's where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
+      - run: pnpm exec playwright test --project=chromium --workers=1 --retries=0 --repeat-each=3 e2e/performance.spec.ts e2e/scene.spec.ts
+        env:
+          CI: true
+          BENCHMARK: true
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-results
+          path: reports/benchmark/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # --- BENCHMARK REPORT ---
+  # History lives in the Actions cache, so this works on a private repo.
+  benchmark-report:
+    name: Benchmark Report
+    needs: [benchmark]
+    if: |
+      (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master' || github.ref_name == 'prod')) ||
+      (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'master' || github.base_ref == 'prod'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: benchmark-results
+          path: reports/benchmark/
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/benchmark
+          key: benchmark-data-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: benchmark-data-${{ github.ref_name }}-
+      - id: check-files
+        run: |
+          mkdir -p .cache/benchmark
+          [ -f reports/benchmark/benchmark-smaller.json ] && echo "smaller=true" >> $GITHUB_OUTPUT || echo "smaller=false" >> $GITHUB_OUTPUT
+          [ -f reports/benchmark/benchmark-bigger.json ] && echo "bigger=true" >> $GITHUB_OUTPUT || echo "bigger=false" >> $GITHUB_OUTPUT
+      - if: steps.check-files.outputs.smaller == 'true'
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: reports/benchmark/benchmark-smaller.json
+          external-data-json-path: .cache/benchmark/data-smaller.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          alert-threshold: '130%'
+          fail-threshold: '200%'
+          comment-on-alert: true
+          summary-always: true
+      - if: steps.check-files.outputs.bigger == 'true'
+        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        with:
+          tool: customBiggerIsBetter
+          output-file-path: reports/benchmark/benchmark-bigger.json
+          external-data-json-path: .cache/benchmark/data-bigger.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          alert-threshold: '130%'
+          fail-threshold: '200%'
+          comment-on-alert: true
+          summary-always: true
+      - if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/benchmark
+          key: benchmark-data-${{ github.ref_name }}-${{ github.run_id }}
+
+  # --- DEPLOY ---
+  #
+  # No host baked in. These jobs gate + hand you dist/client/, you fill in the publish step.
+  # Deploy before release, so a tag never points at something that never went out.
+  #
+  # preprod is wired to GH Pages as an example. One live site per repo, so sandbox/prod stay empty.
+  #
+  #   GH Pages    actions/deploy-pages   (preprod, below)
+  #   Netlify     netlify deploy --dir=dist/client --prod
+  #   S3          aws s3 sync dist/client s3://... --delete
+  #   Your box    rsync -az --delete dist/client/ user@host:/srv/...
+
+  # --- DEPLOY SANDBOX (develop, even if tests fail) ---
+  deploy-sandbox:
+    name: Deploy Sandbox
+    # always() on purpose — sandbox is for poking at things.
+    if: always() && github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: [e2e-test, e2e-mobile]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      - name: Deploy
+        run: |
+          echo "::notice::No deployment provider configured, the site is in ./dist/client"
+          ls -la dist/client
+          # ▼ Your deployment command goes here. ▼
+
+  # --- DEPLOY PREPROD (main). Release only if this succeeded. ---
+  #
+  # GH Pages. Settings → Pages → Source: "GitHub Actions".
+  # Leave it on "Deploy from a branch" and you get the README, not the build.
+  deploy-preprod:
+    name: Deploy Preprod
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [e2e-test, e2e-mobile]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/client
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses:
+          actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+          # ▼ Your deployment command goes here. ▼
+      - name: Smoke-test deployed site
+        run: node scripts/smoke-deployment.mjs "${{ steps.deployment.outputs.page_url }}"
+
+  release-preprod:
+    name: Release Preprod
+    if: needs.deploy-preprod.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [deploy-preprod]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          release-type: node
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: config/release-please/config-preprod.json
+          manifest-file: config/release-please/manifest-preprod.json
+          target-branch: main
+
+  # --- DEPLOY PROD (only if tests passed) ---
+  deploy-prod:
+    name: Deploy Production
+    # No always() — a failed test blocks this.
+    if: github.ref == 'refs/heads/prod' && github.event_name == 'push'
+    needs: [e2e-test, e2e-mobile]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-directory
+          path: dist/client/
+      - name: Deploy
+        run: |
+          echo "::notice::No deployment provider configured, the site is in ./dist/client"
+          ls -la dist/client
+          # ▼ Your deployment command goes here. ▼
+
+  release-prod:
+    name: Release Production
+    if: needs.deploy-prod.result == 'success' && github.ref == 'refs/heads/prod' && github.event_name == 'push'
+    needs: [deploy-prod]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          release-type: node
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: config/release-please/config-prod.json
+          manifest-file: config/release-please/manifest-prod.json
+          target-branch: prod
