@@ -1,0 +1,168 @@
+# https://lefthook.dev/configuration/
+#
+# Call binaries in node_modules/.bin, not `pnpm run` / `pnpm exec`.
+# A hook isn't an interactive shell — if PATH's pnpm isn't the pinned one it
+# re-execs itself and I've seen commits hang on that hop.
+#
+# Anything that can stall goes through scripts/with-timeout.sh.
+
+pre-commit:
+  parallel: true
+
+  commands:
+    # Strict on shared branches, loose elsewhere (a leftover console.log is fine on a feature branch).
+    # stage_fixed only re-adds what the hook touched, never `git add -A`.
+    linter:
+      glob: '*'
+      stage_fixed: true
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod|dev|devel|develop) MAX_WARNINGS="--max-warnings 0" ;;
+          *) echo "Running permissive linter on branch: $BRANCH"; MAX_WARNINGS="" ;;
+        esac
+        sh scripts/with-timeout.sh 300 ./node_modules/.bin/prettier . --check --write \
+          && sh scripts/with-timeout.sh 300 ./node_modules/.bin/eslint --fix $MAX_WARNINGS .
+
+    # Staged files only — full tsc is too slow for a hook.
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: |
+        echo "Running TypeScript type checking on staged files..."
+        sh scripts/with-timeout.sh 180 ./node_modules/.bin/tsc-files --noEmit {staged_files}
+
+    # Re-extract so a new <Trans> can't land without its catalogue entry.
+    i18n:
+      glob: '*.{ts,tsx}'
+      run: |
+        # Redirect to a file. Lefthook gives the child a pty with columns=0, Lingui
+        # then tries to draw its stats table at that width and never comes back.
+        # Same command in a real terminal: <1s. Don't remove the redirect.
+        EXTRACT_LOG=$(mktemp -t lingui-extract)
+        STARTED=$(date +%s)
+        EXTRACT=0
+        sh scripts/with-timeout.sh 60 ./node_modules/.bin/lingui extract --clean > "$EXTRACT_LOG" 2>&1 || EXTRACT=$?
+        ELAPSED=$(( $(date +%s) - STARTED ))
+        cat "$EXTRACT_LOG"
+        rm -f "$EXTRACT_LOG"
+
+        if [ "$EXTRACT" -eq 142 ]; then
+          echo ""
+          echo "❌ lingui extract was killed after 60s. It costs under a second when healthy, so"
+          echo "   it stalled rather than ran slowly. If the redirection above was removed, put"
+          echo "   it back: on lefthook's zero-width pty this command never returns."
+          exit 1
+        elif [ "$EXTRACT" -ne 0 ]; then
+          echo ""
+          echo "❌ lingui extract failed (exit $EXTRACT)."
+          echo "   Run it by hand to see why: ./node_modules/.bin/lingui extract --clean"
+          exit 1
+        fi
+
+        DIFF=0
+        sh scripts/with-timeout.sh 30 git diff --quiet -- src/i18n/messages || DIFF=$?
+
+        if [ "$DIFF" -eq 142 ]; then
+          echo ""
+          echo "❌ The catalogue comparison timed out, so nothing was checked. Same cause as"
+          echo "   above: the machine, not the translations."
+          exit 1
+        elif [ "$DIFF" -ne 0 ]; then
+          echo ""
+          echo "❌ Translation catalogues do not match what is staged."
+          echo "   src/i18n/messages/*.json has just been re-extracted from the working tree."
+          echo "   Review the diff, fill in any empty translation, 'git add' it, and commit again."
+          exit 1
+        fi
+
+        if [ "$ELAPSED" -gt 10 ]; then
+          echo "⚠️  lingui extract took ${ELAPSED}s, against well under a second when healthy."
+        fi
+        echo "✅ Translation catalogues up to date"
+
+    # `pnpm audit` (the built-in), not `pnpm run audit`. Times out if the registry is slow.
+    audit:
+      run: |
+        echo "Running security audit..."
+        sh scripts/with-timeout.sh 120 pnpm audit --prod --audit-level=moderate
+
+    knip:
+      run: |
+        echo "Running Knip to check for unused code..."
+        sh scripts/with-timeout.sh 180 ./node_modules/.bin/knip
+
+    size-limit:
+      run: |
+        if [ -d "dist" ]; then
+          echo "Checking bundle sizes with size-limit..."
+          sh scripts/with-timeout.sh 180 ./node_modules/.bin/size-limit
+        else
+          echo "⏭️  Skipping size-limit check (no dist/ folder found)"
+        fi
+
+    secrets-check:
+      run: node scripts/check-secrets.mjs
+
+    # Added lines of source only. Otherwise deleting a TODO fails the commit.
+    # grep -Ev, not -v: the `+` in the pattern breaks BSD grep / ugrep in basic mode,
+    # and that used to silently pass every commit.
+    fixme-check:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod)
+            echo "🔍 Checking for FIXME/TODO comments on branch: $BRANCH"
+
+            if git diff --cached -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' \
+              | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -E "(FIXME|TODO|XXX|HACK)" --color=always; then
+              echo ""
+              echo "❌ Found FIXME/TODO/XXX/HACK in added source lines - not allowed on $BRANCH"
+              echo "Please resolve these before committing to a production branch."
+              exit 1
+            fi
+
+            echo "✅ No FIXME/TODO comments found"
+            ;;
+          *)
+            echo "⏭️  Skipping FIXME check (not on main/master/prod branch)"
+            ;;
+        esac
+
+    # Fails if the optimiser left new .original files — those need a look.
+    optimize-assets:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          dev|devel|develop)
+            echo "Optimizing staged assets on branch: $BRANCH"
+            sh scripts/with-timeout.sh 300 node scripts/optimize-staged-assets.mjs
+            ;;
+          *)
+            echo "⏭️  Skipping asset optimization (not on a development branch)"
+            ;;
+        esac
+
+# Shared branches only, and just a typecheck. Tests + build used to run here too —
+# that's what CI is for. Doing it again on a laptop with everything else open
+# just made pushes look stuck.
+pre-push:
+  commands:
+    typecheck:
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        case "$BRANCH" in
+          main|master|prod)
+            echo "🔎 Running full type check on branch: $BRANCH"
+            sh scripts/with-timeout.sh 60 ./node_modules/.bin/lingui compile \
+              && sh scripts/with-timeout.sh 60 ./node_modules/.bin/tsr generate \
+              && sh scripts/with-timeout.sh 60 ./node_modules/.bin/tsc --noEmit
+            ;;
+          *)
+            echo "⏭️  Skipping type check (not on main/master/prod branch)"
+            ;;
+        esac
+
+commit-msg:
+  commands:
+    commitlint:
+      run: ./node_modules/.bin/commitlint --edit {1}
