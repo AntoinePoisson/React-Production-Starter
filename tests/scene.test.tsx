@@ -1,7 +1,7 @@
 // Three.js does not run under jsdom: these verify composition. Pixels belong in the Playwright suite.
 
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@react-three/fiber', () => ({
   useFrame: vi.fn(),
@@ -29,6 +29,24 @@ vi.mock('@react-three/drei', () => ({
 
 import Environment from '@/scene/environment/Environment';
 import Experiences from '@/scene/Experiences';
+import { resetReducedMotionCache } from '@/utils/screen/useReducedMotion';
+
+/** Answers `true` to the reduced-motion query and `false` to everything else. */
+function stubReducedMotion(reduced: boolean) {
+  window.matchMedia = ((query: string) =>
+    ({
+      matches: reduced && query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+
+  resetReducedMotionCache();
+}
 
 describe('Environment', () => {
   it('should mount without throwing', () => {
@@ -84,6 +102,13 @@ describe('Environment', () => {
 });
 
 describe('Experiences', () => {
+  const originalMatchMedia = window.matchMedia;
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    resetReducedMotionCache();
+  });
+
   it('should mount the whole demo scene without throwing', () => {
     expect(() => render(<Experiences />)).not.toThrow();
   });
@@ -94,11 +119,21 @@ describe('Experiences', () => {
   });
 
   it('should install orbit controls with the demo constraints', () => {
+    stubReducedMotion(false);
     const { getByTestId } = render(<Experiences />);
     const controls = getByTestId('orbit-controls');
 
     expect(controls.dataset.autorotate).toBe('true');
     expect(controls.dataset.enablepan).toBe('false');
     expect(Number(controls.dataset.mindistance)).toBeLessThan(Number(controls.dataset.maxdistance));
+  });
+
+  it('should stop rotating the camera on its own for prefers-reduced-motion', () => {
+    // globals.css only reaches CSS keyframes. autoRotate is a frame loop, so it has to ask the
+    // query itself (WCAG 2.2.2). Dragging still works, which is why the controls stay mounted.
+    stubReducedMotion(true);
+    const { getByTestId } = render(<Experiences />);
+
+    expect(getByTestId('orbit-controls').dataset.autorotate).toBe('false');
   });
 });

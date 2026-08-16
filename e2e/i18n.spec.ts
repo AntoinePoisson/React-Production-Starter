@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures/webVitalsFixture';
-import { SCENE_BOOT_FAILURE, requiresWorkingWebGL } from './utils/testHelpers';
+import { SCENE_BOOT_FAILURE, requiresWorkingWebGL, waitForHydration } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// Two seperate documents on two URLs, no redirect between them, no JavaScript needed to move
+// Two separate documents on two URLs, no redirect between them, no JavaScript needed to move
 // between them, and no navigation when there is.
 
 const LOCALES = [
@@ -53,6 +53,10 @@ test.describe('Locale routing', () => {
 
   test('should switch language without reloading the document', async ({ pageWithVitals }) => {
     await pageWithVitals.goto('/');
+
+    // The whole point of this test is what the click handler does, so wait until there is one.
+    // Without this the anchor navigates, which is correct behaviour and a failing assertion.
+    await waitForHydration(pageWithVitals);
 
     // A stamp on window survives any number of re-renders and cannot survive a navigation.
     await pageWithVitals.evaluate(() => {
@@ -111,6 +115,11 @@ test.describe('Locale routing', () => {
 
   test('should follow the back button after a switch', async ({ pageWithVitals }) => {
     await pageWithVitals.goto('/');
+
+    // pushState is what this asserts, and only the click handler calls it. Clicking before
+    // hydration navigates instead, which lands on the same URL and passes for the wrong reason.
+    await waitForHydration(pageWithVitals);
+
     await pageWithVitals.getByRole('link', { name: 'Français' }).click();
     await expect(pageWithVitals.locator('html')).toHaveAttribute('lang', 'fr-FR');
 

@@ -55,12 +55,12 @@ const SECRET_PATTERNS = [
   // Generic API Keys & Secrets
   {
     name: 'Generic API Key',
-    pattern: /\b(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?/i,
+    pattern: /\b(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/i,
     severity: 'HIGH'
   },
   {
     name: 'Generic Secret Key',
-    pattern: /\b(secret[_-]?key|secretkey)\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?/i,
+    pattern: /\b(secret[_-]?key|secretkey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/i,
     severity: 'HIGH'
   },
   {
@@ -68,7 +68,7 @@ const SECRET_PATTERNS = [
     // No leading \b, and `api` in the alternation. An underscore is a word character, so \bapi
     // can't match the API in CLOUDFLARE_API_TOKEN, which only ever reached the MEDIUM entropy
     // heuristic and therefore never blocked a commit.
-    pattern: /(access|auth|api|bearer|refresh|session)[_-]?token\s*[:=]\s*['"]?([a-zA-Z0-9_\-\.]{20,})['"]?/i,
+    pattern: /(access|auth|api|bearer|refresh|session)[_-]?token\s*[:=]\s*['"]?([a-zA-Z0-9_.-]{20,})['"]?/i,
     severity: 'HIGH'
   },
 
@@ -114,14 +114,14 @@ const SECRET_PATTERNS = [
   // GitLab Tokens
   {
     name: 'GitLab Personal Access Token',
-    pattern: /\bglpat-[a-zA-Z0-9_\-]{20,}\b/,
+    pattern: /\bglpat-[a-zA-Z0-9_-]{20,}\b/,
     severity: 'CRITICAL'
   },
 
   // Slack Tokens
   {
     name: 'Slack Token',
-    pattern: /\bxox[baprs]-[a-zA-Z0-9\-]{10,}\b/,
+    pattern: /\bxox[baprs]-[a-zA-Z0-9-]{10,}\b/,
     severity: 'HIGH'
   },
   {
@@ -145,7 +145,7 @@ const SECRET_PATTERNS = [
   // Google Cloud
   {
     name: 'Google API Key',
-    pattern: /\bAIza[a-zA-Z0-9_\-]{35}\b/,
+    pattern: /\bAIza[a-zA-Z0-9_-]{35}\b/,
     severity: 'HIGH'
   },
   {
@@ -188,7 +188,7 @@ const SECRET_PATTERNS = [
   // JWT Tokens
   {
     name: 'JWT Token',
-    pattern: /\beyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]+\b/,
+    pattern: /\beyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]+\b/,
     severity: 'HIGH'
   },
 
@@ -209,14 +209,14 @@ const SECRET_PATTERNS = [
   // PyPI Tokens
   {
     name: 'PyPI Token',
-    pattern: /\bpypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_\-]+\b/,
+    pattern: /\bpypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_-]+\b/,
     severity: 'HIGH'
   },
 
   // Docker Hub
   {
     name: 'Docker Hub Token',
-    pattern: /\bdckr_pat_[a-zA-Z0-9_\-]{28,}\b/,
+    pattern: /\bdckr_pat_[a-zA-Z0-9_-]{28,}\b/,
     severity: 'HIGH'
   },
 
@@ -224,7 +224,10 @@ const SECRET_PATTERNS = [
   // codebase and blocked the commit.
   {
     name: 'Heroku API Key',
+    // safe-regex counts the nested `?` in `(api[_-]?)?` as a risk. Every quantifier here is
+    // bounded and none of them overlap, so there is no input that backtracks.
     pattern:
+      // eslint-disable-next-line security/detect-unsafe-regex
       /\bheroku[_-]?(api[_-]?)?key\s*[:=]\s*['"]?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
     severity: 'HIGH'
   },
@@ -232,7 +235,7 @@ const SECRET_PATTERNS = [
   // SendGrid
   {
     name: 'SendGrid API Key',
-    pattern: /\bSG\.[a-zA-Z0-9_\-]{22}\.[a-zA-Z0-9_\-]{43}\b/,
+    pattern: /\bSG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}\b/,
     severity: 'HIGH'
   },
 
@@ -246,7 +249,7 @@ const SECRET_PATTERNS = [
   // Firebase
   {
     name: 'Firebase API Key',
-    pattern: /\bAIza[a-zA-Z0-9_\-]{35}\b/,
+    pattern: /\bAIza[a-zA-Z0-9_-]{35}\b/,
     severity: 'HIGH'
   },
 
@@ -260,21 +263,21 @@ const SECRET_PATTERNS = [
   // Generic Bearer Tokens
   {
     name: 'Bearer Token',
-    pattern: /\bBearer\s+[a-zA-Z0-9_\-\.]{20,}\b/,
+    pattern: /\bBearer\s+[a-zA-Z0-9_.-]{20,}\b/,
     severity: 'HIGH'
   },
 
   // OAuth Client Secrets
   {
     name: 'OAuth Client Secret',
-    pattern: /\bclient[_-]?secret\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?/i,
+    pattern: /\bclient[_-]?secret\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/i,
     severity: 'CRITICAL'
   },
 
   // Generic high entropy strings (potential secrets)
   {
     name: 'High Entropy String',
-    pattern: /['"][a-zA-Z0-9_\-]{40,}['"]/,
+    pattern: /['"][a-zA-Z0-9_-]{40,}['"]/,
     severity: 'MEDIUM',
     validate: (match) => calculateEntropy(match) > 4.5
   }
@@ -330,7 +333,7 @@ function getFileDiff(filePath) {
     return execFileSync('git', ['diff', '--cached', '--', filePath], {
       encoding: 'utf-8'
     });
-  } catch (error) {
+  } catch {
     return '';
   }
 }
@@ -355,6 +358,9 @@ function getFileContent(filePath) {
  */
 function withGlobalFlag(pattern) {
   const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  // Not user input: `pattern` is always one of the SECRET_PATTERNS literals above, and only its
+  // flags change. The rule is about a string from outside reaching the regex engine.
+  // eslint-disable-next-line security/detect-non-literal-regexp
   return new RegExp(pattern.source, flags);
 }
 

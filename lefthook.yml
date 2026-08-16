@@ -50,9 +50,9 @@ pre-commit:
           echo "   Run it by hand to see why: ./node_modules/.bin/lingui extract --clean"
           exit 1
         }
-        if ! git diff --quiet -- src/i18n/messages; then
+        if ! sh scripts/with-timeout.sh 60 git diff --quiet -- src/i18n/messages; then
           echo ""
-          echo "❌ Translation catalogues do not match what is staged."
+          echo "❌ Translation catalogues do not match what is staged (or the check timed out)."
           echo "   src/i18n/messages/*.json has just been re-extracted from the working tree."
           echo "   Review the diff, fill in any empty translation, 'git add' it, and commit again."
           exit 1

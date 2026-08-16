@@ -15,10 +15,13 @@ export default function ErrorPage({ error }: { error: Error }) {
     log.error('Route error', error);
   }, [error]);
 
+  // fixed, like the overlay: the canvas wrapper is a full-height block, so anything left in normal
+  // flow lands below the fold of a body that cannot scroll. pointer-events-none keeps the scene
+  // draggable behind, and each child takes its own back.
   return (
-    <main className='flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center'>
-      <h1 className='text-xl font-semibold'>{t`Something went wrong`}</h1>
-      <p className='max-w-md text-sm opacity-80'>
+    <main className='pointer-events-none fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center'>
+      <h1 className='text-ink pointer-events-auto text-xl font-semibold'>{t`Something went wrong`}</h1>
+      <p className='text-ink-muted pointer-events-auto max-w-md text-sm'>
         {t`The page hit an unexpected error. Trying again is usually enough; if it keeps happening, reload the site.`}
       </p>
       <button

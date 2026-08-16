@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import type { Group, Mesh } from 'three';
 import type { GLTF } from 'three-stdlib';
 
+import { usePrefersReducedMotion } from '@/utils/screen/useReducedMotion';
 import { sceneColor } from '@/utils/theme/Palette';
 
 /**
@@ -25,9 +26,11 @@ const ROTATION_SPEED = 0.25; // radians per second
 export default function DemoModel() {
   const groupRef = useRef<Group>(null);
   const { nodes } = useGLTF(MODEL_PATH, DRACO_PATH) as unknown as GLTFResult;
+  const reducedMotion = usePrefersReducedMotion();
 
   useFrame((_state, delta) => {
-    if (!groupRef.current) return;
+    // Nothing to restore: the rotation only ever accumulates from its initial zero.
+    if (reducedMotion || !groupRef.current) return;
     groupRef.current.rotation.y += delta * ROTATION_SPEED;
     groupRef.current.rotation.z += delta * ROTATION_SPEED * 0.35;
   });

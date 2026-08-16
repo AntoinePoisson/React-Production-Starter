@@ -75,7 +75,7 @@ export const localeHead = (locale: Locale): { meta: Tag[]; links: Tag[] } => {
     meta: [
       { title: SITE_TITLE },
       { name: 'description', content: description },
-      { name: 'keywords', content: 'react, vite, react three fiber, threejs, template, starter' },
+      // No `keywords`: no search engine has read it since 2009 and it only ever goes stale.
       { name: 'robots', content: 'index, follow' },
 
       { property: 'og:type', content: 'website' },

@@ -31,7 +31,6 @@ export default [
       'storybook-static/**',
       '.tanstack/**',
       '**/*.cjs',
-      '**/*.mjs',
       // Generated, not source.
       'src/i18n/messages/*.ts', // lingui compile
       'src/routeTree.gen.ts',
@@ -40,7 +39,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -148,6 +147,12 @@ export default [
     // documented cost of the convention.
     files: ['src/routes/**/*.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' }
+  },
+  {
+    // Build tooling, outside the TypeScript program: `project: true` makes the parser demand a
+    // tsconfig that lists the file, and none does. No type-aware rule is enabled here anyway.
+    files: ['**/*.mjs'],
+    languageOptions: { parserOptions: { project: false } }
   },
   {
     // Scripts are CLIs, their output is the interface.

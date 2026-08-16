@@ -18,11 +18,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import sharp from 'sharp';
+
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { draco, dedup, prune } from '@gltf-transform/functions';
+import { dedup, draco, prune } from '@gltf-transform/functions';
 import draco3d from 'draco3dgltf';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

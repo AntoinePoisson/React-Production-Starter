@@ -4,6 +4,7 @@ import { InstancedMesh, Object3D } from 'three';
 
 import type { Breakpoint } from '@/utils/screen/Breakpoints';
 import { useBreakpoint } from '@/utils/screen/useBreakpoint';
+import { usePrefersReducedMotion } from '@/utils/screen/useReducedMotion';
 import { sceneColor } from '@/utils/theme/Palette';
 
 // Density per device. Width is a rough proxy for GPU budget, tier on hardwareConcurrency or a
@@ -12,7 +13,7 @@ const COUNT_BY_BREAKPOINT: Record<Breakpoint, number> = { wide: 28, desktop: 22,
 
 const GOLDEN_ANGLE = 2.399963229728653;
 
-// Reused every frame. Never allocate inside useFrame, it shows up immediatly in the profiler.
+// Reused every frame. Never allocate inside useFrame, it shows up immediately in the profiler.
 const dummy = new Object3D();
 
 type Satellite = { radius: number; speed: number; phase: number; height: number; scale: number };
@@ -20,6 +21,13 @@ type Satellite = { radius: number; speed: number; phase: number; height: number;
 export default function FloatingShapes() {
   const meshRef = useRef<InstancedMesh>(null);
   const count = COUNT_BY_BREAKPOINT[useBreakpoint()];
+  const reducedMotion = usePrefersReducedMotion();
+
+  // Which mesh the still layout was written to, or null while animating. Holding the mesh and not
+  // a boolean is what makes a breakpoint change repose: key={count} swaps the instancedMesh out
+  // while this component stays mounted, so a flag would leave the new one at the identity matrix,
+  // every satellite stacked at the origin.
+  const settledFor = useRef<InstancedMesh | null>(null);
 
   // Golden angle instead of Math.random so the layout is identical on every reload.
   const satellites = useMemo<Satellite[]>(
@@ -41,7 +49,11 @@ export default function FloatingShapes() {
     const mesh = meshRef.current;
     if (!mesh) return;
 
-    const time = state.clock.elapsedTime;
+    // Reduced motion: lay the satellites out once at t = 0, then stop touching the matrices.
+    // Skipping the write outright would leave them at the identity matrix, not still.
+    if (reducedMotion && settledFor.current === mesh) return;
+
+    const time = reducedMotion ? 0 : state.clock.elapsedTime;
 
     for (let i = 0; i < satellites.length; i++) {
       const { radius, speed, phase, height, scale } = satellites[i];
@@ -59,6 +71,7 @@ export default function FloatingShapes() {
     }
 
     mesh.instanceMatrix.needsUpdate = true;
+    settledFor.current = reducedMotion ? mesh : null;
   });
 
   return (

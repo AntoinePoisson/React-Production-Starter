@@ -67,6 +67,20 @@ test.describe('Application Smoke Tests', () => {
     expect(filteredErrors.length).toBe(0);
   });
 
+  test('should show the 404 page over the canvas rather than below it', async ({ pageWithVitals }) => {
+    // No status assertion: `serve` answers an unknown path with 404.html and a 404, the dev
+    // server renders the same component with a 200. What both owe is a readable page.
+    await pageWithVitals.goto('/this-route-does-not-exist');
+
+    // The canvas is what made this fail: R3F's wrapper is a full-height block, so a system page
+    // left in normal flow rendered below the fold of a body that cannot scroll. Present in the
+    // DOM, impossible to reach — which is why toBeVisible() alone would not have caught it.
+    await waitForR3FScene(pageWithVitals);
+
+    await expect(pageWithVitals.getByRole('heading', { level: 1 })).toBeInViewport();
+    await expect(pageWithVitals.getByRole('link')).toBeInViewport();
+  });
+
   test('should load all essential assets without failures', async ({ pageWithVitals }) => {
     const failedRequests: string[] = [];
 

@@ -154,7 +154,8 @@ Settings → Secrets and variables → Actions → Variables.
 
 ## Deployment
 
-There is none, on purpose. The three deploy jobs carry the full gating logic and an empty step:
+Empty by design, except for one worked example. `deploy-sandbox` and `deploy-prod` carry the full
+gating logic and an empty step:
 
 ```yaml
 - name: Deploy
@@ -165,13 +166,13 @@ There is none, on purpose. The three deploy jobs carry the full gating logic and
 
 Publish `dist/client/`. Some examples:
 
-| Host         | Step                                                         |
-| ------------ | ------------------------------------------------------------ |
-| GitHub Pages | `actions/deploy-pages` after `actions/upload-pages-artifact` |
-| Netlify      | `netlify deploy --dir=dist/client --prod`                    |
-| Cloudflare   | `cloudflare/wrangler-action` with `command: deploy`          |
-| S3 / CDN     | `aws s3 sync dist/client s3://bucket --delete`               |
-| Your own box | `rsync -az --delete dist/client/ user@host:/srv/site/`       |
+| Host         | Step                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| Website-Demo | `actions/deploy-pages` after `actions/upload-pages-artifact` — wired on `deploy-preprod` |
+| Netlify      | `netlify deploy --dir=dist/client --prod`                                                |
+| Cloudflare   | `cloudflare/wrangler-action` with `command: deploy`                                      |
+| S3 / CDN     | `aws s3 sync dist/client s3://bucket --delete`                                           |
+| Your own box | `rsync -az --delete dist/client/ user@host:/srv/site/`                                   |
 
 Two things the build guarantees whatever you pick:
 

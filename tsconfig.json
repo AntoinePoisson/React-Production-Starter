@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    /* `noEmit` is on, so `target` only decides which APIs are assumed present. ES2022 is the floor
+       Vite 8 builds for, and `lib` carried both ES2020 and esnext, where esnext simply won. */
+    "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable", "esnext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "allowJs": true,

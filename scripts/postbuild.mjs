@@ -10,7 +10,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -166,6 +166,9 @@ if (import.meta.main) {
   // The head gets assembled with the stylesheet and the module preloads ahead of the CSP, and a
   // meta policy only governs what follows it. After <meta charset> and not before, the encoding
   // declaration has to land within the first 1024 bytes.
+  // safe-regex flags the optional group around `[^>]*`. The class excludes `>`, the only character
+  // that can end the match, so nothing overlaps and no input backtracks.
+  // eslint-disable-next-line security/detect-unsafe-regex
   const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
   const CHARSET_META = /<meta[^>]*\scharset=["'][^"']*["'][^>]*>/i;
   const SW_TAG = '<script src="/registerSW.js" defer></script>';

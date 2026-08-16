@@ -5,6 +5,8 @@
 **Production starter for static React sites with a WebGL scene.**<br>
 React 19 · Vite 8 · TanStack Start · React Three Fiber — pre-rendered, translated, measured.
 
+**[Live demo →](https://antoinepoisson.github.io/React-Production-Starter/)**
+
 <!-- The badges point at this repository. After `node initialize.js`, swap the owner/repo in the
      CI badge and re-measure the rest: they are numbers, not decorations. -->
 
@@ -145,8 +147,8 @@ out of the service worker precache.
 
 ## Deployment
 
-`.github/workflows/ci.yml` has three deploy jobs — `develop`, `main`, `prod` — with the gating
-logic in place and an empty step to fill in:
+`.github/workflows/ci.yml` has three deploy jobs — `develop`, `main`, `prod`. `develop` and `prod`
+carry the gating logic and an empty step to fill in:
 
 ```yaml
 - name: Deploy
@@ -154,6 +156,12 @@ logic in place and an empty step to fill in:
     echo "::notice::No deployment provider configured — the site is in ./dist/client"
     # ▼ Your deployment command goes here. ▼
 ```
+
+`main` is wired to GitHub Pages for real — that's what serves the
+[live demo](https://antoinepoisson.github.io/React-Production-Starter/) above. It needs one repo
+setting no workflow file can set: **Settings → Pages → Build and deployment → Source: "GitHub
+Actions"**. Left on "Deploy from a branch", Pages renders `README.md` instead, since
+`dist/client/` is never committed.
 
 Publish `dist/client/`. Keep deploy before release, so no tag points at undeployed code.
 `develop` and `main` deploy even if tests fail; `prod` does not.
