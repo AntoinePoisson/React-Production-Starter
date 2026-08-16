@@ -8,6 +8,8 @@
       "bump-patch-for-minor-pre-major": true,
       "draft": false,
       "versioning": "default",
+      "prerelease": false,
+      "label": "release,production,automated",
       "include-component-in-tag": false,
       "include-v-in-tag": true,
       "changelog-host": "https://github.com",

@@ -186,8 +186,11 @@ Keep the deploy step exiting non-zero on failure, that is what stops the release
 
 ## Versioning
 
-Release-Please, with one manifest per branch:
-`.release-please-manifest-preprod.json` (main) and `-prod.json` (prod).
+Release-Please, with one manifest and one config per branch:
+`.release-please-manifest-preprod.json` / `.release-please-config-preprod.json` (main, prerelease)
+and the `-prod` equivalents (prod, stable). Two config files, not one shared, because `prerelease`
+and `versioning` live in the config file since release-please-action v5 — they used to be action
+inputs, and a shared config can't give preprod and prod different prerelease behaviour.
 
 | Commit type                    | Bump  |
 | ------------------------------ | ----- |
