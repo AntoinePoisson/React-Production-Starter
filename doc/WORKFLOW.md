@@ -48,7 +48,7 @@ CI/CD (.github/workflows/ci.yml)
 | **Role**             | Sandbox | Preprod      | Production     |
 | **Lint mode**        | Strict  | Strict       | Strict         |
 | **FIXME check**      | No      | Yes          | Yes            |
-| **Pre-push tests**   | No      | Yes          | Yes            |
+| **Pre-push check**   | No      | Typecheck    | Typecheck      |
 | **Deploy condition** | Always  | Always       | All tests pass |
 | **Version format**   | None    | `vX.Y.Z-pre` | `vX.Y.Z`       |
 
@@ -97,8 +97,7 @@ Managed by [Lefthook](https://lefthook.dev). All pre-commit hooks run **in paral
 | `secrets-check`                  | pre-commit | run     | run    | run    |
 | `fixme-check`                    | pre-commit | skip    | run    | run    |
 | `optimize-assets`                | pre-commit | run     | skip   | skip   |
-| `tests`                          | pre-push   | skip    | run    | run    |
-| `build`                          | pre-push   | skip    | run    | run    |
+| `typecheck` (full project)       | pre-push   | skip    | run    | run    |
 | `commitlint`                     | commit-msg | run     | run    | run    |
 
 `stage_fixed: true` re-stages only the files the hooks rewrote, never `git add -A`.

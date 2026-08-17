@@ -125,47 +125,27 @@ pre-commit:
             ;;
         esac
 
-# Long-running, production branches only.
-#
-# Sequential, unlike pre-commit. `vitest run --coverage` takes every core and `vite build` runs
-# its own worker pool, so in parallel they starve each other and whatever else is on the machine.
-# A push that appeared frozen on "waiting: build" was the lingui step of the build getting no CPU
-# while the test run held it all. Sequential is also readable: you see which step you are on.
+# Production branches only. Deliberately light: the full test suite and the production build
+# (three.js, GLTF, Workbox) used to run here too, but that's exactly what CI already does on a
+# dedicated runner before deploy. Running it a second time on a laptop that's also running an
+# editor, a browser and whatever else, means any ordinary contention makes a push look frozen —
+# with-timeout.sh was eventually killing it, which read as "hangs forever" rather than "the CI job
+# you're about to trigger is going to do this same work properly." One fast local check is enough
+# to catch a typo before it reaches GitHub; CI is the real gate.
 pre-push:
-  parallel: false
-  piped: true
-
   commands:
-    # Numbered because `piped` runs them in name order and the build must not start until the
-    # tests have released the machine.
-    1_tests:
+    typecheck:
       run: |
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         case "$BRANCH" in
           main|master|prod)
-            echo "🧪 Running full test suite on branch: $BRANCH"
-            sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui compile \
-              && sh scripts/with-timeout.sh 900 ./node_modules/.bin/vitest run --coverage
+            echo "🔎 Running full type check on branch: $BRANCH"
+            sh scripts/with-timeout.sh 60 ./node_modules/.bin/lingui compile \
+              && sh scripts/with-timeout.sh 60 ./node_modules/.bin/tsr generate \
+              && sh scripts/with-timeout.sh 60 ./node_modules/.bin/tsc --noEmit
             ;;
           *)
-            echo "⏭️  Skipping tests (not on main/master/prod branch)"
-            ;;
-        esac
-
-    2_build:
-      run: |
-        BRANCH=$(git rev-parse --abbrev-ref HEAD)
-        case "$BRANCH" in
-          main|master|prod)
-            echo "🏗️  Running production build on branch: $BRANCH"
-            echo "⚠️  This may take a couple of minutes..."
-            sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui extract --clean \
-              && sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui compile --strict \
-              && sh scripts/with-timeout.sh 600 ./node_modules/.bin/vite build \
-              && sh scripts/with-timeout.sh 120 node scripts/postbuild.mjs
-            ;;
-          *)
-            echo "⏭️  Skipping build (not on main/master/prod branch)"
+            echo "⏭️  Skipping type check (not on main/master/prod branch)"
             ;;
         esac
 
