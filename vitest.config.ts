@@ -34,7 +34,8 @@ export default defineConfig({
       thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 }
     },
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', 'dist', 'dist-ssr', 'coverage', 'storybook-static']
+    exclude: ['node_modules', 'dist', 'dist-ssr', 'coverage', 'storybook-static'],
+    env: { VITE_SITE_URL: '' }
   },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }

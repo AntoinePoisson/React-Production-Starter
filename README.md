@@ -23,7 +23,7 @@ React 19 · Vite 8 · TanStack Start · React Three Fiber — pre-rendered, tran
 [![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![three.js](https://img.shields.io/badge/three.js-0.185-000000?logo=threedotjs&logoColor=white)](https://threejs.org)
 
-<img src="doc/media/scene.gif" alt="The starter running: a 3D knot turning against a lit ground, floating shapes drifting around it, behind a DOM overlay carrying the title, the copy and the language switcher" width="880">
+<img src="doc/media/scene.gif" alt="The starter running: a 3D knot turning against a lit ground, floating shapes drifting around it, behind a DOM overlay carrying the title, the two call-to-action buttons and the language switcher" width="880">
 
 </div>
 
@@ -129,8 +129,8 @@ Everything else stays at the root, where its own tool and the editor look for it
 routes, so a scene mounted inside one is destroyed on every language switch.
 
 <div align="center">
-  <img src="doc/media/demo.gif" alt="Switching from English to French: the copy changes and the 3D scene keeps rotating from exactly where it was" width="760">
-  <p><em>Switching locale swaps the catalogue in place — same WebGL context, same camera, no reload.</em></p>
+  <img src="doc/media/locale-fr.png" alt="The same page served at /fr: the title, the copy and both buttons are in French, and the switcher marks Français as the current language" width="760">
+  <p><em>The same shell at <code>/fr</code>. Switching locale swaps the catalogue in place — same WebGL context, same camera, no reload.</em></p>
 </div>
 
 **The overlay is pre-rendered, the canvas is not.** The copy is in the HTML and paints before

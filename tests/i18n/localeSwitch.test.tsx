@@ -70,6 +70,10 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  // Both for the sub-path test below, which reloads Site.ts against a stubbed environment. Here
+  // rather than in the test itself, so a failed assertion cannot leak the stub into the next one.
+  vi.unstubAllEnvs();
+  vi.resetModules();
 });
 
 describe('localeFromPath', () => {
@@ -176,6 +180,20 @@ describe('LanguageSwitcher', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: 'English' })).toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Français' })).not.toBeInTheDocument();
+  });
+
+  // The suite runs at the origin root (VITE_SITE_URL is pinned in vitest.config.ts), so the one
+  // thing it would otherwise never see is the deployment this template ships with: a GitHub Pages
+  // project site mounted under /<repository>.
+  it('should prefix its hrefs with the deployment base path', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_SITE_URL', 'https://example.com/app');
+
+    const { default: BasedSwitcher } = await import('@/components/ui/LanguageSwitcher');
+
+    render(withI18n(<BasedSwitcher />));
+
+    expect(screen.getByRole('link', { name: 'Français' })).toHaveAttribute('href', '/app/fr');
   });
 
   it.each(['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const)(
