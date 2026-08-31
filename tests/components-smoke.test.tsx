@@ -21,6 +21,7 @@ vi.mock('@react-three/fiber', () => ({
 }));
 
 vi.mock('@react-three/drei', () => ({
+  PerformanceMonitor: () => null,
   Preload: () => <div data-testid='mock-preload'>Preload</div>,
   useGLTF: Object.assign(
     vi.fn(() => ({ nodes: {}, materials: {}, scene: {} })),

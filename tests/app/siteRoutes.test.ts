@@ -3,7 +3,14 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { FALLBACK_URL, resolveSiteUrl, toAbsoluteUrl } from '@/utils/config/SiteRules';
+import {
+  FALLBACK_URL,
+  basePathFromSiteUrl,
+  resolveSiteUrl,
+  toAbsoluteUrl,
+  withBasePath,
+  withoutBasePath
+} from '@/utils/config/SiteRules';
 
 import { seoFiles } from '../../scripts/postbuild.mjs';
 
@@ -37,6 +44,29 @@ describe('Site origin rules', () => {
       expect(toAbsoluteUrl('/fr', 'https://example.com/app')).toBe('https://example.com/app/fr');
     });
   });
+
+  describe('deployment base paths', () => {
+    it('should derive the mount point from the full site URL', () => {
+      expect(basePathFromSiteUrl('https://example.com')).toBe('');
+      expect(basePathFromSiteUrl('https://example.com/app/')).toBe('/app');
+    });
+
+    it('should prefix routes and assets exactly once', () => {
+      expect(withBasePath('/fr', '')).toBe('/fr');
+      expect(withBasePath('fr', '/app')).toBe('/app/fr');
+      expect(withBasePath('/app', '/app')).toBe('/app');
+      expect(withBasePath('/app/icons/favicon.svg', '/app')).toBe('/app/icons/favicon.svg');
+    });
+
+    it('should recover route paths from browser locations', () => {
+      expect(withoutBasePath('', '')).toBe('/');
+      expect(withoutBasePath('/fr', '')).toBe('/fr');
+      expect(withoutBasePath('/app', '/app')).toBe('/');
+      expect(withoutBasePath('/app/fr', '/app')).toBe('/fr');
+      expect(withoutBasePath('/elsewhere', '/app')).toBe('/elsewhere');
+      expect(withoutBasePath('', '/app')).toBe('/');
+    });
+  });
 });
 
 describe('Generated SEO files', () => {
@@ -63,6 +93,16 @@ describe('Generated SEO files', () => {
     // Translations listed without being cross-linked read as duplicate content.
     expect(sitemap).toContain('hreflang="fr-FR"');
     expect(sitemap).toContain('hreflang="x-default"');
+  });
+
+  it('should keep every generated URL below a deployment base path', () => {
+    const siteUrl = 'https://example.com/app';
+    const { robots, sitemap, llms } = generate({ VITE_SITE_URL: siteUrl });
+
+    expect(robots).toContain(`${siteUrl}/sitemap.xml`);
+    expect(sitemap).toContain(`<loc>${siteUrl}/</loc>`);
+    expect(sitemap).toContain(`<loc>${siteUrl}/fr</loc>`);
+    expect(llms).toContain(`(${siteUrl}/fr)`);
   });
 
   it('should publish links in llms.txt', () => {

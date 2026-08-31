@@ -21,10 +21,15 @@ vi.mock('@/app/globals.css?url', () => ({ default: '/assets/globals.css' }));
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid='canvas'>{children}</div>,
   useFrame: () => {},
-  useThree: () => ({})
+  useThree: () => ({
+    invalidate: () => {},
+    setFrameloop: () => {},
+    gl: { domElement: document.createElement('canvas') }
+  })
 }));
 
 vi.mock('@react-three/drei', () => ({
+  PerformanceMonitor: () => null,
   OrbitControls: () => null,
   Html: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useProgress: () => ({ progress: 100, active: false }),
@@ -102,6 +107,13 @@ describe('Root route', () => {
 
     // three.js needs a WebGL context and the prerender runs in Node. The overlay does have to be
     // in that HTML, which is why only one of the two is wrapped in <ClientOnly>.
+    const Shell = root.shellComponent;
+
+    expect(renderToStaticMarkup(<Shell>{null}</Shell>)).not.toContain('data-testid="canvas"');
+  });
+
+  it('should leave the dedicated static 404 free of the WebGL scene', () => {
+    pathname = '/404';
     const Shell = root.shellComponent;
 
     expect(renderToStaticMarkup(<Shell>{null}</Shell>)).not.toContain('data-testid="canvas"');

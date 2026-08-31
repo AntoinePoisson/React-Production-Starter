@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { inlineStylesheet } from '../../scripts/postbuild.mjs';
+import { inlineStylesheet, makeStaticNotFound } from '../../scripts/postbuild.mjs';
 
 const CSS = ':root{--color-ink:#0b1220}';
 const HASH = `sha256-${createHash('sha256').update(CSS).digest('base64')}`;
@@ -69,5 +69,20 @@ describe('inlineStylesheet', () => {
     const html = document(POLICY);
 
     expect(inlineStylesheet(html, readCss)).toBe(html);
+  });
+
+  it('should recognise a stylesheet below the deployment base path', () => {
+    const based = LINK.replace('href="/static/', 'href="/app/static/');
+    const html = inlineStylesheet(document(POLICY, based), readCss, '/app');
+
+    expect(html).toContain(`<style>${CSS}</style>`);
+  });
+});
+
+describe('makeStaticNotFound', () => {
+  it('should remove inline and external scripts while preserving useful HTML', () => {
+    const html = '<main>Page not found</main><script>hydrate()</script><script src="/app.js"></script>';
+
+    expect(makeStaticNotFound(html)).toBe('<main>Page not found</main>');
   });
 });

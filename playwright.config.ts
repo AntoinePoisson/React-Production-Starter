@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const deploymentBasePath =
+  process.env.CI && process.env.VITE_SITE_URL ? new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, '') : '';
+const testServerUrl = `http://localhost:3120${deploymentBasePath || ''}`;
+
 /**
  * Five projects: three desktop browsers plus two mobile viewports. Web Vitals come from the
  * pageWithVitals fixture. Screenshot comparison is wired up but no spec uses it yet.
@@ -35,7 +39,7 @@ export default defineConfig({
   })(),
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3120',
+    baseURL: process.env.BASE_URL || testServerUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: process.env.CI ? 'retain-on-failure' : 'off',
@@ -75,11 +79,13 @@ export default defineConfig({
 
   webServer: {
     // CI serves the real build so the specs measure what ships, locally the dev server keeps the
-    // loop fast. dist/client and not dist, the build also emits a dist/server nobody deploys.
+    // loop fast. dist/serve and not dist/client: `serve` mounts a directory at /, and a project
+    // site lives below /<repository>, so the CI job stages the build under its base path first.
+    // Never dist/ itself, the build also emits a dist/server nobody deploys.
     command: process.env.CI
-      ? './node_modules/.bin/serve ./dist/client --listen 3120 --config ../../serve.json --no-clipboard --no-request-logging --no-port-switching'
+      ? './node_modules/.bin/serve ./dist/serve --listen 3120 --config ../../config/serve.json --no-clipboard --no-request-logging --no-port-switching'
       : 'lsof -ti :3120 | xargs kill -9 2>/dev/null || true && ./node_modules/.bin/lingui compile && ./node_modules/.bin/vite dev --port 3120',
-    url: 'http://localhost:3120',
+    url: testServerUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
     stdout: 'ignore',

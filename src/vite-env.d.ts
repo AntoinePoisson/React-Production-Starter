@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
 
 // Only VITE_-prefixed variables reach the client bundle, and Vite inlines them at build time, so
-// setting one on the host afterwards changes nothing. All optional: the app has to behave with
-// none of them set.
+// setting one on the host afterwards changes nothing. Local development has safe defaults;
+// VITE_SITE_URL is mandatory in CI builds.
 interface ImportMetaEnv {
-  /** Required in CI, or every page ships a localhost canonical. */
+  /** Canonical URL and deployment base path. Required in CI. */
   readonly VITE_SITE_URL?: string;
   /** Namespaces client storage keys. */
   readonly VITE_PROJECT_NAME?: string;

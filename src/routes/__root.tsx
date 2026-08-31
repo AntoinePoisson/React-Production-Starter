@@ -50,6 +50,7 @@ function NoScriptNotice() {
 function RootDocument({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const locale = localeFromPath(pathname);
+  const isStaticNotFoundDocument = pathname === '/404';
 
   // For identity, not speed. useLocaleSwitch calls activate() on the mounted instance and a fresh
   // one on every render would throw that call away.
@@ -69,15 +70,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           {/* Mounted here and not in the page. / and /fr are different routes, so a scene
               mounted in either gets destroyed on every language switch. The Suspense is
               mandatory, lazy() suspends and an unbounded suspension takes the tree down. */}
-          <ClientOnly fallback={<BootLoader />}>
-            {() => (
-              <Suspense fallback={<BootLoader />}>
-                <ThreeCanvas>
-                  <Experiences />
-                </ThreeCanvas>
-              </Suspense>
-            )}
-          </ClientOnly>
+          {!isStaticNotFoundDocument && (
+            <ClientOnly fallback={<BootLoader />}>
+              {() => (
+                <Suspense fallback={<BootLoader />}>
+                  <ThreeCanvas>
+                    <Experiences />
+                  </ThreeCanvas>
+                </Suspense>
+              )}
+            </ClientOnly>
+          )}
 
           {children}
         </I18nProvider>

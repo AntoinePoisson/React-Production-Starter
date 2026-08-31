@@ -18,7 +18,13 @@ import { generateSW } from 'workbox-build';
 
 import { DEFAULT_LOCALE, LOCALES, LOCALE_LABELS, alternateLanguages, localePath } from '../src/i18n/Routing.ts';
 import { SITE_TITLE } from '../src/utils/config/Identity.ts';
-import { resolveSiteUrl, toAbsoluteUrl } from '../src/utils/config/SiteRules.ts';
+import {
+  basePathFromSiteUrl,
+  resolveSiteUrl,
+  toAbsoluteUrl,
+  withBasePath,
+  withoutBasePath
+} from '../src/utils/config/SiteRules.ts';
 
 const colors = { reset: '\x1b[0m', green: '\x1b[32m', blue: '\x1b[36m' };
 
@@ -29,9 +35,10 @@ const colors = { reset: '\x1b[0m', green: '\x1b[32m', blue: '\x1b[36m' };
  */
 export function seoFiles(env = process.env) {
   const siteUrl = resolveSiteUrl(env.VITE_SITE_URL);
+  const basePath = basePathFromSiteUrl(siteUrl);
   const url = (path) => toAbsoluteUrl(path, siteUrl);
 
-  const robots = `User-Agent: *\nAllow: /\n\nHost: ${siteUrl}\nSitemap: ${url('sitemap.xml')}\n`;
+  const robots = `User-Agent: *\nAllow: /\n\nHost: ${new URL(siteUrl).origin}\nSitemap: ${url('sitemap.xml')}\n`;
 
   // Without the cross-links the translations read as duplicate content.
   const alternates = Object.entries(alternateLanguages())
@@ -77,7 +84,7 @@ export function seoFiles(env = process.env) {
     ''
   ].join('\n');
 
-  return { siteUrl, files: { 'robots.txt': robots, 'sitemap.xml': sitemap, 'llms.txt': llms } };
+  return { siteUrl, basePath, files: { 'robots.txt': robots, 'sitemap.xml': sitemap, 'llms.txt': llms } };
 }
 
 const CSP_META = /<meta[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i;
@@ -95,13 +102,14 @@ const ESCAPED_QUOTE = '&#x27;';
  * __root.tsx still declares the sheet, so React re-inserts its <link> during hydration. That's
  * why the file has to stay in static/. readCss is a parameter so this is testable on a string.
  */
-export function inlineStylesheet(html, readCss) {
+export function inlineStylesheet(html, readCss, basePath = '') {
   const hashes = [];
+  const staticPrefix = withBasePath('/static/', basePath);
 
   const withStyles = html.replace(STYLESHEET_LINK, (tag) => {
     const href = tag.match(LINK_HREF)?.[1];
     // Anything else is a third party's sheet, whose bytes this build doesn't have.
-    if (!href?.startsWith('/static/')) return tag;
+    if (!href?.startsWith(staticPrefix)) return tag;
 
     const css = readCss(href);
     hashes.push(`sha256-${createHash('sha256').update(css).digest('base64')}`);
@@ -128,12 +136,21 @@ export function inlineStylesheet(html, readCss) {
   });
 }
 
+/**
+ * A static host answers every unknown path with this one document. Hydrating state prerendered
+ * for /404 at /anything makes React discard the document with error #418, so the deployed 404 is
+ * deliberately progressive HTML: readable, styled, linked, and script-free.
+ */
+export function makeStaticNotFound(html) {
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+}
+
 // Only runs when this file is the entry point, not when vite.config.ts imports seoFiles().
 if (import.meta.main) {
   const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
   const OUT_DIR = join(PROJECT_ROOT, process.argv[2] ?? 'dist/client');
 
-  const { siteUrl, files } = seoFiles();
+  const { siteUrl, basePath, files } = seoFiles();
 
   for (const [name, content] of Object.entries(files)) {
     writeFileSync(join(OUT_DIR, name), content);
@@ -158,9 +175,11 @@ if (import.meta.main) {
     maximumFileSizeToCacheInBytes: 4 * 1024 * 1024
   });
 
+  const swUrl = withBasePath('/sw.js', basePath);
+  const swScope = `${basePath || ''}/`;
   writeFileSync(
     join(OUT_DIR, 'registerSW.js'),
-    "if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js',{scope:'/'})})}\n"
+    `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('${swUrl}',{scope:'${swScope}'})})}\n`
   );
 
   // The head gets assembled with the stylesheet and the module preloads ahead of the CSP, and a
@@ -171,7 +190,7 @@ if (import.meta.main) {
   // eslint-disable-next-line security/detect-unsafe-regex
   const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
   const CHARSET_META = /<meta[^>]*\scharset=["'][^"']*["'][^>]*>/i;
-  const SW_TAG = '<script src="/registerSW.js" defer></script>';
+  const SW_TAG = `<script src="${withBasePath('/registerSW.js', basePath)}" defer></script>`;
 
   const htmlFiles = (function walk(dir) {
     return readdirSync(dir).flatMap((entry) => {
@@ -186,11 +205,21 @@ if (import.meta.main) {
   for (const file of htmlFiles) {
     let html = readFileSync(file, 'utf-8');
     const before = html;
+    const isStaticNotFound = file === join(OUT_DIR, '404.html');
 
-    if (!html.includes(SW_TAG)) html = html.replace('</body>', `${SW_TAG}</body>`);
+    if (!isStaticNotFound && !html.includes(SW_TAG)) html = html.replace('</body>', `${SW_TAG}</body>`);
 
     // Before the move below, which reads the policy's position from the patched document.
-    html = inlineStylesheet(html, (href) => readFileSync(join(OUT_DIR, href.slice(1)), 'utf-8'));
+    html = inlineStylesheet(
+      html,
+      (href) => {
+        const localPath = withoutBasePath(new URL(href, siteUrl).pathname, basePath);
+        return readFileSync(join(OUT_DIR, localPath.slice(1)), 'utf-8');
+      },
+      basePath
+    );
+
+    if (isStaticNotFound) html = makeStaticNotFound(html);
 
     const meta = html.match(CSP_META);
     const head = html.match(HEAD_OPEN);

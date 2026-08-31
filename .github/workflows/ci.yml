@@ -12,6 +12,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+# A GitHub Pages project site lives below /<repository>. Keeping this default here prevents a
+# missing repository variable from silently baking localhost or origin-root URLs into the build.
+env:
+  VITE_SITE_URL: ${{ vars.VITE_SITE_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+
 jobs:
   # --- LINT ---
   lint:
@@ -183,7 +188,6 @@ jobs:
         env:
           # Required: a static build bakes this in, so without it every page ships a localhost
           # canonical. Settings > Secrets and variables > Actions.
-          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
           VITE_PROJECT_NAME: ${{ vars.VITE_PROJECT_NAME }}
           VITE_MAIN_WEBSITE_NAME: ${{ vars.VITE_MAIN_WEBSITE_NAME }}
       # dist/client only, dist/server is the render pass and is never deployed.
@@ -263,8 +267,6 @@ jobs:
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
-        env:
-          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
 
   # --- E2E DESKTOP - 3 browsers x 4 shards ---
   e2e-test:
@@ -314,6 +316,16 @@ jobs:
         with:
           name: build-directory
           path: dist/client/
+      # `serve` mounts a directory at /, and a GitHub Pages project site lives below
+      # /<repository>. Staging the build under its own base path is what lets the specs request
+      # the URLs the build actually emits. 404.html is copied to the server root too: that is
+      # where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
       - run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4
         env:
           CI: true
@@ -376,6 +388,16 @@ jobs:
         with:
           name: build-directory
           path: dist/client/
+      # `serve` mounts a directory at /, and a GitHub Pages project site lives below
+      # /<repository>. Staging the build under its own base path is what lets the specs request
+      # the URLs the build actually emits. 404.html is copied to the server root too: that is
+      # where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
       - run: pnpm exec playwright test --project=${{ matrix.project }}
         env:
           CI: true
@@ -428,6 +450,16 @@ jobs:
         with:
           name: build-directory
           path: dist/client/
+      # `serve` mounts a directory at /, and a GitHub Pages project site lives below
+      # /<repository>. Staging the build under its own base path is what lets the specs request
+      # the URLs the build actually emits. 404.html is copied to the server root too: that is
+      # where serve-handler looks for it.
+      - name: Stage the build under the deployment base path
+        run: |
+          BASE=$(node -p 'new URL(process.env.VITE_SITE_URL).pathname.replace(/\/+$/, "")')
+          mkdir -p "dist/serve$BASE"
+          cp -R dist/client/. "dist/serve$BASE/"
+          cp dist/client/404.html dist/serve/404.html
       - run: pnpm exec playwright test --project=chromium --workers=1 --retries=0 --repeat-each=3 e2e/performance.spec.ts e2e/scene.spec.ts
         env:
           CI: true
@@ -565,6 +597,8 @@ jobs:
         uses:
           actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
           # ▼ Your deployment command goes here. ▼
+      - name: Smoke-test deployed site
+        run: node scripts/smoke-deployment.mjs "${{ steps.deployment.outputs.page_url }}"
 
   release-preprod:
     name: Release Preprod
@@ -580,8 +614,8 @@ jobs:
         with:
           release-type: node
           token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: .release-please-config-preprod.json
-          manifest-file: .release-please-manifest-preprod.json
+          config-file: config/release-please/config-preprod.json
+          manifest-file: config/release-please/manifest-preprod.json
           target-branch: main
 
   # --- DEPLOY PROD - prod, only if every test passed ---
@@ -618,6 +652,6 @@ jobs:
         with:
           release-type: node
           token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: .release-please-config-prod.json
-          manifest-file: .release-please-manifest-prod.json
+          config-file: config/release-please/config-prod.json
+          manifest-file: config/release-please/manifest-prod.json
           target-branch: prod

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Regenerates every raster brand asset from one vector source. A script rather than a folder of
- * hand-exported PNGs because "export eight sizes, remember the maskable safe zone, remember the
- * OG aspect ratio" is the step everyone skips. Edit MARK and COLORS below and rerun.
+ * Regenerates every raster brand asset from public/icons/favicon.svg. A script rather than a
+ * folder of hand-exported PNGs because "export eight sizes, remember the maskable safe zone,
+ * remember the OG aspect ratio" is the step everyone skips.
+ *
+ * Replace the mark in favicon.svg and rerun. That file is the tab icon the browser actually
+ * loads, so generating the rasters from anything else lets the two drift apart.
  *
  * Produces:
  *   public/icons/favicon-32x32.png            browser tab (legacy raster path)
@@ -18,7 +21,7 @@
  * Usage: pnpm assets:brand
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +32,7 @@ const sharp = require('sharp');
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ICONS_DIR = join(PROJECT_ROOT, 'public/icons');
 const PUBLIC_DIR = join(PROJECT_ROOT, 'public');
+const MARK_SOURCE = join(ICONS_DIR, 'favicon.svg');
 
 /**
  * Mirrors the @theme static tokens in globals.css. Literals rather than parsed out of the CSS:
@@ -38,45 +42,81 @@ const PUBLIC_DIR = join(PROJECT_ROOT, 'public');
 const COLORS = {
   ink: '#0f172a',
   accent: '#6b8cfa',
-  skyTop: '#c9dcf0',
-  skyHorizon: '#e9eef2'
+  ground: '#e9eef2'
 };
 
-// Drawn in a 100x100 box so every size below is one scale factor away. Geometric and text-free
-// on purpose, text would need a font file committed to the repo to render the same everywhere.
-const MARK = (fill) => `<path fill="${fill}" d="M50 18 84 76H16L50 18Z"/>`;
+const TITLE = 'React App Fondation';
 
-// Maskable icons get masked to a circle, a squircle or a rounded square depending on the
-// launcher, and only the central 80% circle is guaranteed visible. 55% keeps the mark clear of
-// every mask, at the cost of looking smaller than the "any" variant. Hence two separate files.
-const MASKABLE_MARK_RATIO = 0.55;
-const STANDARD_MARK_RATIO = 0.72;
+/**
+ * Only the .fg path is read. The background rect and the prefers-color-scheme block stay with the
+ * SVG: a PNG has no theme, and each raster draws its own ground below.
+ */
+async function readMark() {
+  const svg = await readFile(MARK_SOURCE, 'utf-8');
+  const box = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  // Two passes, so the attribute order inside the tag doesn't matter.
+  const tag = svg.match(/<path\b[^>]*class="fg"[^>]*>/)?.[0];
+  const path = tag?.match(/\sd="([^"]+)"/)?.[1];
 
-const svgIcon = ({ size, background, markRatio, rounded }) => {
-  const markSize = size * markRatio;
-  const offset = (size - markSize) / 2;
-  const radius = rounded ? size * 0.22 : 0;
+  if (!box || box[1] !== box[2] || !path) {
+    throw new Error(`${MARK_SOURCE} needs a square viewBox and a <path class="fg" d="…"> mark.`);
+  }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${radius}" fill="${background}"/>
-  <g transform="translate(${offset} ${offset}) scale(${markSize / 100})">${MARK(COLORS.accent)}</g>
-</svg>`;
+  return { box: Number(box[1]), path };
+}
+
+const MARK = await readMark();
+
+/**
+ * Scales the source viewBox, not the mark: favicon.svg carries its own padding, so the visible
+ * mark ends up smaller than these numbers suggest. Maskable icons get masked to a circle, a
+ * squircle or a rounded square depending on the launcher, and only the central 80% circle is
+ * guaranteed visible — hence a second, tighter variant rather than one shared file.
+ */
+const MASKABLE_SCALE = 0.7;
+const STANDARD_SCALE = 0.92;
+
+const markLayer = (size, scale) => {
+  const drawn = size * scale;
+  const offset = (size - drawn) / 2;
+
+  return `<g transform="translate(${offset} ${offset}) scale(${drawn / MARK.box})"><path fill="${COLORS.accent}" d="${MARK.path}"/></g>`;
 };
 
-const svgOgImage = () => `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${COLORS.skyTop}"/>
-      <stop offset="62%" stop-color="${COLORS.skyHorizon}"/>
-      <stop offset="100%" stop-color="${COLORS.skyHorizon}"/>
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="630" fill="url(#sky)"/>
-  <!-- Mark and rule are centred as a group, not each on its own, otherwise the rule reads as a
-       stray element on a very empty canvas. -->
-  <g transform="translate(490 190) scale(2.2)">${MARK(COLORS.accent)}</g>
-  <rect x="530" y="418" width="140" height="6" rx="3" fill="${COLORS.ink}" opacity="0.18"/>
+const iconLayer = ({ size, scale, rounded, x = 0, y = 0 }) =>
+  `<g transform="translate(${x} ${y})">
+    <rect width="${size}" height="${size}" rx="${rounded ? size * 0.22 : 0}" fill="${COLORS.ink}"/>
+    ${markLayer(size, scale)}
+  </g>`;
+
+const svgIcon = ({ size, scale, rounded }) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${iconLayer({ size, scale, rounded })}</svg>`;
+
+const OG_SIZE = { width: 1200, height: 630 };
+const OG_MARGIN = 100;
+const OG_ICON = 160;
+const OG_GAP = 48;
+
+/**
+ * The app icon and the name, on a flat ground. Nothing else: og:description already carries the
+ * sentence, and a second copy inside the image only goes stale.
+ *
+ * One text element, no committed font file, so the wordmark renders with whatever the machine
+ * running this resolves. The PNG is committed, so that machine is the author's and never CI.
+ */
+function svgOgImage() {
+  const textX = OG_MARGIN + OG_ICON + OG_GAP;
+  // Arial Bold averages ~0.56em per character. Rough, but enough to keep a long project name
+  // inside the canvas without font metrics to measure with.
+  const available = OG_SIZE.width - textX - OG_MARGIN;
+  const fontSize = Math.min(62, Math.floor(available / (TITLE.length * 0.56)));
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_SIZE.width}" height="${OG_SIZE.height}" viewBox="0 0 ${OG_SIZE.width} ${OG_SIZE.height}">
+  <rect width="${OG_SIZE.width}" height="${OG_SIZE.height}" fill="${COLORS.ground}"/>
+  ${iconLayer({ size: OG_ICON, scale: STANDARD_SCALE, rounded: true, x: OG_MARGIN, y: (OG_SIZE.height - OG_ICON) / 2 })}
+  <text x="${textX}" y="${OG_SIZE.height / 2 + fontSize * 0.35}" fill="${COLORS.ink}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" letter-spacing="-2">${TITLE}</text>
 </svg>`;
+}
 
 /** Max compression, these ship on every share and every install. */
 const toPng = (svg) => sharp(Buffer.from(svg)).png({ compressionLevel: 9, palette: true, effort: 10 }).toBuffer();
@@ -84,29 +124,29 @@ const toPng = (svg) => sharp(Buffer.from(svg)).png({ compressionLevel: 9, palett
 const OUTPUTS = [
   {
     file: join(ICONS_DIR, 'favicon-32x32.png'),
-    svg: () => svgIcon({ size: 32, background: COLORS.ink, markRatio: STANDARD_MARK_RATIO, rounded: true })
+    svg: () => svgIcon({ size: 32, scale: STANDARD_SCALE, rounded: true })
   },
   {
     // iOS composites onto white and applies its own rounding, so this one stays opaque and
     // square. Rounding it here produces visible corners on the home screen.
     file: join(ICONS_DIR, 'apple-touch-icon.png'),
-    svg: () => svgIcon({ size: 180, background: COLORS.ink, markRatio: STANDARD_MARK_RATIO, rounded: false })
+    svg: () => svgIcon({ size: 180, scale: STANDARD_SCALE, rounded: false })
   },
   {
     file: join(ICONS_DIR, 'icon-192x192.png'),
-    svg: () => svgIcon({ size: 192, background: COLORS.ink, markRatio: STANDARD_MARK_RATIO, rounded: true })
+    svg: () => svgIcon({ size: 192, scale: STANDARD_SCALE, rounded: true })
   },
   {
     file: join(ICONS_DIR, 'icon-512x512.png'),
-    svg: () => svgIcon({ size: 512, background: COLORS.ink, markRatio: STANDARD_MARK_RATIO, rounded: true })
+    svg: () => svgIcon({ size: 512, scale: STANDARD_SCALE, rounded: true })
   },
   {
     file: join(ICONS_DIR, 'icon-192-maskable.png'),
-    svg: () => svgIcon({ size: 192, background: COLORS.ink, markRatio: MASKABLE_MARK_RATIO, rounded: false })
+    svg: () => svgIcon({ size: 192, scale: MASKABLE_SCALE, rounded: false })
   },
   {
     file: join(ICONS_DIR, 'icon-512-maskable.png'),
-    svg: () => svgIcon({ size: 512, background: COLORS.ink, markRatio: MASKABLE_MARK_RATIO, rounded: false })
+    svg: () => svgIcon({ size: 512, scale: MASKABLE_SCALE, rounded: false })
   },
   {
     file: join(PUBLIC_DIR, 'og-image.png'),
@@ -168,7 +208,7 @@ for (const { file, svg } of OUTPUTS) {
 const icoImages = await Promise.all(
   ICO_SIZES.map(async (size) => ({
     size,
-    data: await toPng(svgIcon({ size, background: COLORS.ink, markRatio: STANDARD_MARK_RATIO, rounded: true }))
+    data: await toPng(svgIcon({ size, scale: STANDARD_SCALE, rounded: true }))
   }))
 );
 const ico = packIco(icoImages);
@@ -176,7 +216,6 @@ await writeFile(join(PUBLIC_DIR, 'favicon.ico'), ico);
 console.info(`${colors.green}✓${colors.reset} public/favicon.ico ${formatBytes(ico.length)} (${ICO_SIZES.join('/')})`);
 
 console.info(
-  `\n${colors.blue}Placeholders regenerated.${colors.reset} Replace MARK and COLORS above with your own\n` +
-    `artwork, then rerun. The maskable variants keep the mark inside the central 80% circle,\n` +
-    `check any replacement against https://maskable.app before shipping it.\n`
+  `\n${colors.blue}Regenerated from public/icons/favicon.svg.${colors.reset} Check any replacement\n` +
+    `mark against https://maskable.app before shipping it.\n`
 );

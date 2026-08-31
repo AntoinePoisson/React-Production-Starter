@@ -36,26 +36,60 @@ pre-commit:
 
     # Re-extracts the catalogues so a new <Trans> can't reach a branch without its entry.
     # --clean drops what a rename left behind.
-    #
-    # It reports instead of staging, on purpose: `lingui extract` reads src/ from disk, not from
-    # the index. Stage one file while another in the working tree carries a new (or deleted)
-    # <Trans> and a `git add` here would commit entries for code that isn't in the commit. The
-    # files are already rewritten on disk when this fails, review them and stage them yourself.
     i18n:
       glob: '*.{ts,tsx}'
       run: |
-        sh scripts/with-timeout.sh 120 ./node_modules/.bin/lingui extract --clean || {
+        # Output goes to a file, not to the terminal, and that is load-bearing.
+        #
+        # Lefthook gives each command a pty but never sets its window size, so the child sees
+        # isTTY=true with columns=0. The Lingui CLI lays its "Catalog statistics" table out to
+        # that width and never finishes: the commit hangs on a step that costs under a second by
+        # hand, because a real shell reports 120 or 200 columns and never 0. Redirecting makes
+        # stdout a file, isTTY goes false, and the table takes the plain-text path.
+        #
+        # Measured on a pty left at its default 0x0: no output, no exit, still running after
+        # three minutes. The same binary through a pipe or a file: 0.7s.
+        EXTRACT_LOG=$(mktemp -t lingui-extract)
+        STARTED=$(date +%s)
+        EXTRACT=0
+        sh scripts/with-timeout.sh 60 ./node_modules/.bin/lingui extract --clean > "$EXTRACT_LOG" 2>&1 || EXTRACT=$?
+        ELAPSED=$(( $(date +%s) - STARTED ))
+        cat "$EXTRACT_LOG"
+        rm -f "$EXTRACT_LOG"
+
+        if [ "$EXTRACT" -eq 142 ]; then
           echo ""
-          echo "❌ lingui extract failed or timed out."
+          echo "❌ lingui extract was killed after 60s. It costs under a second when healthy, so"
+          echo "   it stalled rather than ran slowly. If the redirection above was removed, put"
+          echo "   it back: on lefthook's zero-width pty this command never returns."
+          exit 1
+        elif [ "$EXTRACT" -ne 0 ]; then
+          echo ""
+          echo "❌ lingui extract failed (exit $EXTRACT)."
           echo "   Run it by hand to see why: ./node_modules/.bin/lingui extract --clean"
           exit 1
-        }
-        if ! sh scripts/with-timeout.sh 60 git diff --quiet -- src/i18n/messages; then
+        fi
+
+        DIFF=0
+        sh scripts/with-timeout.sh 30 git diff --quiet -- src/i18n/messages || DIFF=$?
+
+        if [ "$DIFF" -eq 142 ]; then
           echo ""
-          echo "❌ Translation catalogues do not match what is staged (or the check timed out)."
+          echo "❌ The catalogue comparison timed out, so nothing was checked. Same cause as"
+          echo "   above: the machine, not the translations."
+          exit 1
+        elif [ "$DIFF" -ne 0 ]; then
+          echo ""
+          echo "❌ Translation catalogues do not match what is staged."
           echo "   src/i18n/messages/*.json has just been re-extracted from the working tree."
           echo "   Review the diff, fill in any empty translation, 'git add' it, and commit again."
           exit 1
+        fi
+
+        # A run that crept up to tens of seconds is the same fault, just not yet fatal. Saying so
+        # is the only way it gets noticed before it turns into a timed-out commit.
+        if [ "$ELAPSED" -gt 10 ]; then
+          echo "⚠️  lingui extract took ${ELAPSED}s, against well under a second when healthy."
         fi
         echo "✅ Translation catalogues up to date"
 

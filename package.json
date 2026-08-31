@@ -26,13 +26,14 @@
     "e2e:install": "./node_modules/.bin/playwright install --with-deps",
     "build": "./node_modules/.bin/lingui extract --clean && ./node_modules/.bin/lingui compile --strict && ./node_modules/.bin/vite build && node scripts/postbuild.mjs",
     "analyze": "ANALYZE=true pnpm run build",
-    "website": "./node_modules/.bin/serve ./dist/client --listen 3200 --config ../../serve.json --no-clipboard --no-port-switching",
+    "website": "./node_modules/.bin/serve ./dist/client --listen 3200 --config ../../config/serve.json --no-clipboard --no-port-switching",
     "storybook": "./node_modules/.bin/storybook dev --port 3140 --no-open",
     "build:storybook": "./node_modules/.bin/storybook build --output-dir storybook-static",
     "initialize": "node initialize.js",
     "clean": "rm -rf node_modules/ dist/ dist-ssr/ coverage/ reports/ storybook-static/ tsconfig.tsbuildinfo",
     "knip": "./node_modules/.bin/knip",
     "size": "./node_modules/.bin/size-limit",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
     "optimize-assets": "node scripts/optimize-assets.mjs all",
     "assets:brand": "node scripts/generate-brand-assets.mjs",
     "audit": "pnpm audit --prod --audit-level=moderate",
@@ -199,7 +200,6 @@
   },
   "knip": {
     "entry": [
-      "src/router.tsx",
       "src/routes/**/*.tsx",
       "lingui.config.ts",
       ".storybook/*.{ts,tsx}",
@@ -251,6 +251,13 @@
   "pnpm": {
     "overrides": {
       "nanoid": ">=3.3.18"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "esbuild",
+      "lefthook",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

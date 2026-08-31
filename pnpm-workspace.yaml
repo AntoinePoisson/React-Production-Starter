@@ -1,8 +1,0 @@
-# pnpm blocks install scripts by default. These packages need theirs: without the entry,
-# sharp ships no binary, esbuild no platform build, and lefthook installs no git hooks.
-onlyBuiltDependencies:
-  - '@tailwindcss/oxide'
-  - esbuild
-  - lefthook
-  - sharp
-  - unrs-resolver

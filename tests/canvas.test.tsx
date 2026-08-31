@@ -1,11 +1,14 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // three.js doesn't run under jsdom. Keep the props so a test can drive onCreated.
-const { canvasProps } = vi.hoisted(() => ({ canvasProps: [] as Record<string, unknown>[] }));
+const { canvasProps, monitorProps } = vi.hoisted(() => ({
+  canvasProps: [] as Record<string, unknown>[],
+  monitorProps: [] as Record<string, unknown>[]
+}));
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children, className, ...rest }: { children: React.ReactNode; className?: string }) => {
@@ -18,6 +21,13 @@ vi.mock('@react-three/fiber', () => ({
         {children}
       </div>
     );
+  }
+}));
+
+vi.mock('@react-three/drei', () => ({
+  PerformanceMonitor: (props: Record<string, unknown>) => {
+    monitorProps.push(props);
+    return null;
   }
 }));
 
@@ -74,6 +84,35 @@ describe('ThreeCanvas', () => {
     );
 
     expect(screen.getByTestId('mock-canvas')).not.toHaveClass('touch-none');
+  });
+
+  it('should expose an accessible, focusable scene region', () => {
+    render(withI18n(<ThreeCanvas>{null}</ThreeCanvas>));
+
+    const props = canvasProps.at(-1);
+    expect(props?.role).toBe('region');
+    expect(props?.tabIndex).toBe(0);
+    // The label carries the keyboard commands too, so CameraKeyboardControls is discoverable
+    // without a second copy of the instructions living in the overlay.
+    expect(props?.['aria-label']).toMatch(/arrow keys/i);
+    expect(props?.['aria-label']).toMatch(/drag/i);
+  });
+
+  it('should adapt its DPR to measured rendering performance', () => {
+    monitorProps.length = 0;
+    render(withI18n(<ThreeCanvas>{null}</ThreeCanvas>));
+
+    expect(canvasProps.at(-1)?.dpr).toEqual([1, 1.5]);
+    expect(monitorProps.at(-1)?.flipflops).toBe(3);
+
+    act(() => (monitorProps.at(-1)?.onIncline as () => void)());
+    expect(canvasProps.at(-1)?.dpr).toEqual([1, 2]);
+
+    act(() => (monitorProps.at(-1)?.onDecline as () => void)());
+    expect(canvasProps.at(-1)?.dpr).toEqual([1, 1]);
+
+    act(() => (monitorProps.at(-1)?.onFallback as () => void)());
+    expect(canvasProps.at(-1)?.dpr).toEqual([1, 1]);
   });
 
   it('should have that gesture rule declared on the canvas itself', () => {

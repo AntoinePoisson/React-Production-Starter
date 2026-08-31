@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures/webVitalsFixture';
+import { appPath, expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, requiresWorkingWebGL, waitForHydration } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
@@ -20,12 +20,12 @@ test.describe('Locale routing', () => {
 
   for (const locale of LOCALES) {
     test(`should serve ${locale.name} at ${locale.path} with the right lang`, async ({ pageWithVitals }) => {
-      const response = await pageWithVitals.goto(locale.path);
+      const response = await pageWithVitals.goto(appPath(locale.path));
 
       // Pathname compared exactly, slash included. status() reports the end of the redirect
       // chain, so a server bouncing /fr to /fr/ would still read 200 here.
       expect(response?.status()).toBe(200);
-      expect(new URL(pageWithVitals.url()).pathname).toBe(locale.path);
+      expect(new URL(pageWithVitals.url()).pathname).toBe(appPath(locale.path));
 
       await expect(pageWithVitals.locator('html')).toHaveAttribute('lang', locale.tag);
       await expect(pageWithVitals.getByRole('heading', { level: 1 })).toBeVisible();
@@ -33,7 +33,7 @@ test.describe('Locale routing', () => {
     });
 
     test(`should declare hreflang alternates on ${locale.name}`, async ({ pageWithVitals }) => {
-      await pageWithVitals.goto(locale.path);
+      await pageWithVitals.goto(appPath(locale.path));
 
       // Without these Google treats the translations as duplicates and indexes one.
       for (const other of LOCALES) {
@@ -44,15 +44,15 @@ test.describe('Locale routing', () => {
     });
 
     test(`should point ${locale.name} at its own canonical`, async ({ pageWithVitals }) => {
-      await pageWithVitals.goto(locale.path);
+      await pageWithVitals.goto(appPath(locale.path));
 
       const canonical = await pageWithVitals.locator('link[rel="canonical"]').getAttribute('href');
-      expect(new URL(canonical as string).pathname).toBe(locale.path);
+      expect(new URL(canonical as string).pathname).toBe(appPath(locale.path));
     });
   }
 
   test('should switch language without reloading the document', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     // The whole point of this test is what the click handler does, so wait until there is one.
     // Without this the anchor navigates, which is correct behaviour and a failing assertion.
@@ -65,14 +65,14 @@ test.describe('Locale routing', () => {
 
     // Still a real href, crawlers and cmd-click need it. Only the plain click is intercepted.
     const toFrench = pageWithVitals.getByRole('link', { name: 'Français' });
-    await expect(toFrench).toHaveAttribute('href', '/fr');
+    await expect(toFrench).toHaveAttribute('href', appPath('/fr'));
     await toFrench.click();
 
     await expect(pageWithVitals.locator('html')).toHaveAttribute('lang', 'fr-FR');
     await expect(pageWithVitals.locator('body')).toContainText('glissez pour pivoter');
 
     // The URL has to follow, or a reload lands back on English and a shared link is wrong.
-    expect(new URL(pageWithVitals.url()).pathname).toBe('/fr');
+    expect(new URL(pageWithVitals.url()).pathname).toBe(appPath('/fr'));
 
     const sameDocument = await pageWithVitals.evaluate(
       () => (window as unknown as { __sameDocument?: boolean }).__sameDocument === true
@@ -81,14 +81,14 @@ test.describe('Locale routing', () => {
 
     // Back again, the reverse direction loads a catalogue that was never in the initial payload.
     const back = pageWithVitals.getByRole('link', { name: 'English' });
-    await expect(back).toHaveAttribute('href', '/');
+    await expect(back).toHaveAttribute('href', appPath('/'));
     await back.click();
     await expect(pageWithVitals.locator('html')).toHaveAttribute('lang', 'en-US');
     await expect(pageWithVitals.locator('body')).toContainText('drag to orbit');
   });
 
   test('should keep the WebGL context across a language switch', async ({ pageWithVitals }, testInfo) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     const sceneLoaded = await waitForR3FScene(pageWithVitals, 30000);
     if (!sceneLoaded) {
@@ -114,7 +114,7 @@ test.describe('Locale routing', () => {
   });
 
   test('should follow the back button after a switch', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     // pushState is what this asserts, and only the click handler calls it. Clicking before
     // hydration navigates instead, which lands on the same URL and passes for the wrong reason.
@@ -128,11 +128,11 @@ test.describe('Locale routing', () => {
     // pushState adds a session-history entry, the back button has to be able to undo it.
     await expect(pageWithVitals.locator('html')).toHaveAttribute('lang', 'en-US');
     await expect(pageWithVitals.locator('body')).toContainText('drag to orbit');
-    expect(new URL(pageWithVitals.url()).pathname).toBe('/');
+    expect(new URL(pageWithVitals.url()).pathname).toBe(appPath('/'));
   });
 
   test('should not link the current locale to itself', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/fr');
+    await pageWithVitals.goto(appPath('/fr'));
 
     // A link to the page you're already on is noise for keyboard and screen-reader users.
     const nav = pageWithVitals.getByRole('navigation');
@@ -141,10 +141,10 @@ test.describe('Locale routing', () => {
   });
 
   test('should translate the copy, not just the markup', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const english = await pageWithVitals.getByRole('heading', { level: 1 }).locator('..').innerText();
 
-    await pageWithVitals.goto('/fr');
+    await pageWithVitals.goto(appPath('/fr'));
     const french = await pageWithVitals.getByRole('heading', { level: 1 }).locator('..').innerText();
 
     expect(french).not.toBe(english);
@@ -152,12 +152,12 @@ test.describe('Locale routing', () => {
 
   test('should ship the copy in the HTML rather than in the JavaScript', async ({ pageWithVitals, request }) => {
     // Holds on every build, the copy is server-rendered either way.
-    const html = await (await request.get('/fr')).text();
+    const html = await (await request.get(appPath('/fr'))).text();
     expect(html).toContain('glissez pour pivoter');
 
     test.skip(!MEASURES_PRODUCTION_BUILD, 'the chunk check only holds against a production build');
 
-    await pageWithVitals.goto('/fr');
+    await pageWithVitals.goto(appPath('/fr'));
     const scripts = await pageWithVitals
       .locator('script[src]')
       .evaluateAll((nodes) => nodes.map((node) => (node as HTMLScriptElement).src));
@@ -182,11 +182,11 @@ test.describe('Locale routing without JavaScript', () => {
   test.use({ javaScriptEnabled: false });
 
   test('should still switch language by following the link', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(appPath('/'));
 
     await page.getByRole('link', { name: 'Français' }).click();
 
-    expect(new URL(page.url()).pathname).toBe('/fr');
+    expect(new URL(page.url()).pathname).toBe(appPath('/fr'));
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr-FR');
     await expect(page.locator('body')).toContainText('glissez pour pivoter');
   });

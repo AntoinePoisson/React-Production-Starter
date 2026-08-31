@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="xxtemplatexx">
-  <!-- Placeholder mark. Replace with your own artwork; see the New Project Checklist.
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="React App Fondation">
+  <!-- The one vector source. `pnpm assets:brand` reads the .fg path out of this file to build
+       every raster icon and the OG image, so keep the class and the square viewBox.
        Colours mirror --color-accent / --color-ink in app/globals.css. -->
   <style>
     .bg { fill: #0f172a }

@@ -1,13 +1,13 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 
-import { SITE_TITLE } from '@/utils/config/Identity';
+import { REPOSITORY_URL, SITE_TITLE } from '@/utils/config/Identity';
 
 import FirstVisitReveal from './FirstVisitReveal';
 import LanguageSwitcher from './LanguageSwitcher';
 
 /**
- * Copy stays in the DOM instead of a 3D texture: selectable, translatable, indexable, accessible.
- * It's also in the prerendered HTML, so it paints before the 3D bundle downloads.
+ * The DOM layer over the canvas. Copy lives here rather than in a 3D texture: it stays
+ * selectable, translatable and readable by a screen reader.
  */
 export default function Overlay() {
   const { t } = useLingui();
@@ -26,6 +26,22 @@ export default function Overlay() {
         <p className='text-ink-muted pointer-events-auto mt-1 w-fit max-w-md text-sm sm:text-base'>
           {t`React + Vite + React Three Fiber starter — drag to orbit, scroll to zoom.`}
         </p>
+
+        {/* min-h-11 on both: a 44px target is the smallest WCAG 2.2 accepts without an exception. */}
+        <div className='pointer-events-auto mt-4 flex w-fit flex-wrap gap-2'>
+          <a
+            className='bg-ink text-surface hover:bg-ink/90 inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium'
+            href={REPOSITORY_URL}
+          >
+            {t`Explore the code`}
+          </a>
+          <a
+            className='border-ink/15 text-ink hover:bg-ink/5 inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium'
+            href={`${REPOSITORY_URL}#getting-started`}
+          >
+            {t`Read the guide`}
+          </a>
+        </div>
       </header>
 
       <div className='flex items-end justify-between gap-4'>

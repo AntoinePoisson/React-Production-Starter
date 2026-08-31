@@ -18,13 +18,17 @@ export default function NotFound() {
     <main className='pointer-events-none fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center'>
       {/* One string and not a fragment: React 19 hoists <title> and rejects several children. */}
       <title>{`${t`Page not found`} | ${SITE_TITLE}`}</title>
+      <meta
+        content='noindex, nofollow'
+        name='robots'
+      />
 
       <h1 className='text-ink pointer-events-auto text-xl font-semibold'>
         <Trans>Page not found</Trans>
       </h1>
 
       <Link
-        className='text-ink-subtle hover:text-ink pointer-events-auto text-sm underline-offset-4 hover:underline'
+        className='text-ink-subtle hover:text-ink pointer-events-auto flex min-h-11 items-center rounded-lg px-3 text-sm underline-offset-4 hover:underline'
         to='/'
       >
         <Trans>Back to home</Trans>

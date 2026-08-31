@@ -71,6 +71,12 @@ describe('rootHead', () => {
     expect(rels).toContain('apple-touch-icon');
     expect(rels.filter((rel) => rel === 'icon')).toHaveLength(2);
   });
+
+  it('should prefix public assets below a deployment base path', async () => {
+    const { rootHead: basedRootHead } = await loadMetadata({ VITE_SITE_URL: 'https://example.com/app' });
+
+    expect(basedRootHead().links.every((link) => link.href.startsWith('/app/'))).toBe(true);
+  });
 });
 
 describe('localeHead', () => {
@@ -128,6 +134,14 @@ describe('localeHead', () => {
 
     // A relative og:image is ignored by every scraper.
     expect(image?.content).toBe('https://example.com/og-image.png');
+  });
+
+  it('should keep canonical and social URLs below a deployment base path', async () => {
+    const { localeHead } = await loadMetadata({ VITE_SITE_URL: 'https://example.com/app' });
+    const head = localeHead('fr');
+
+    expect(head.links.find((tag) => tag.rel === 'canonical')?.href).toBe('https://example.com/app/fr');
+    expect(head.meta.find((tag) => tag.property === 'og:image')?.content).toBe('https://example.com/app/og-image.png');
   });
 
   it.each(['https://example.com', ''])('should declare the page indexable with origin %j', async (origin) => {

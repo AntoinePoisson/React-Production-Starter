@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import { BREAKPOINTS, breakpointForWidth } from '@/utils/screen/Breakpoints';
 
-import { expect, test } from './fixtures/webVitalsFixture';
+import { appPath, expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
@@ -46,7 +46,7 @@ test.describe('Responsive layout', () => {
       pageWithVitals
     }) => {
       await pageWithVitals.setViewportSize({ width: viewport.width, height: viewport.height });
-      await pageWithVitals.goto('/');
+      await pageWithVitals.goto(appPath('/'));
 
       // Never select by data-testid, babel-plugin-react-remove-properties strips it from the
       // production build. Such a selector passes in dev and fails against the deployed site.
@@ -74,7 +74,7 @@ test.describe('Responsive layout', () => {
   }
 
   test('should reveal the secondary copy only from the tablet tier up', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const footer = pageWithVitals.locator('footer');
 
     await pageWithVitals.setViewportSize({ width: BREAKPOINTS.tablet - 1, height: 800 });
@@ -85,7 +85,7 @@ test.describe('Responsive layout', () => {
   });
 
   test('should scale the heading up with the viewport', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const heading = pageWithVitals.getByRole('heading', { level: 1 });
 
     const fontSizeAt = async (width: number): Promise<number> => {
@@ -102,7 +102,7 @@ test.describe('Responsive layout', () => {
   });
 
   test('should keep the canvas filling the viewport at every size', async ({ pageWithVitals }, testInfo) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     // The one test here that needs WebGL: R3F only sizes the element once it has a renderer,
     // so with no GL the canvas sits at the HTML default of 300×150 and this measures nothing.
@@ -140,7 +140,7 @@ test.describe('Responsive layout', () => {
 
   test('should survive an orientation flip', async ({ pageWithVitals }) => {
     await pageWithVitals.setViewportSize({ width: 390, height: 844 });
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     const heading = pageWithVitals.getByRole('heading', { level: 1 });
     await expect(heading).toBeVisible();
@@ -162,7 +162,7 @@ test.describe('Responsive layout', () => {
   });
 
   test('should not let the page rubber-band or scroll', async ({ pageWithVitals }) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     // A full-screen canvas app that scrolls slides under the finger instead of orbiting.
     const { overflowY, overscroll } = await pageWithVitals.evaluate(() => {
@@ -179,7 +179,7 @@ test.describe('Touch and pointer handling', () => {
   test('should let the canvas swallow gestures while leaving the copy selectable', async ({
     pageWithVitals
   }, testInfo) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     const overlayCopy = pageWithVitals.getByRole('heading', { level: 1 });
     const selectable = await overlayCopy.evaluate((element) => getComputedStyle(element).userSelect);

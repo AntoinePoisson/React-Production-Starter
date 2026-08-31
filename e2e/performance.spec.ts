@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures/webVitalsFixture';
+import { appPath, expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { WEB_VITALS_THRESHOLDS, waitForR3FScene } from './utils/webVitals';
 
@@ -11,7 +11,7 @@ test.describe('Performance', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('should have acceptable Core Web Vitals', async ({ pageWithVitals }, testInfo) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     // Vitals from a page that never booted are flattering nonsense. No 3D means no main-thread
     // work means a great LCP, so skip rather than measure the overlay on its own.
@@ -74,7 +74,7 @@ test.describe('Performance', () => {
     test.skip(isMobile(testInfo), 'Desktop only - memory leak detection');
     test.setTimeout(120_000);
 
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const sceneReady = await waitForR3FScene(pageWithVitals);
     if (!sceneReady) {
       if (requiresWorkingWebGL(testInfo)) throw new Error(SCENE_BOOT_FAILURE);

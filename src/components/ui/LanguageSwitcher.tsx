@@ -2,6 +2,7 @@ import { useLingui } from '@lingui/react/macro';
 
 import { LOCALES, LOCALE_LABELS, LOCALE_TAGS, type Locale, localePath } from '@/i18n/Routing';
 import { useLocaleSwitch } from '@/i18n/useLocaleSwitch';
+import { publicPath } from '@/utils/config/Site';
 
 /**
  * Anchors rather than a <select>: a real URL works before hydration, opens in a new tab and gets
@@ -26,14 +27,14 @@ export default function LanguageSwitcher() {
       aria-label={t`Language`}
       // ml-auto and not the parent's justify-between: the sibling footer is hidden sm:block, so
       // below 640px this would fall back to flex-start.
-      className='pointer-events-auto ml-auto flex items-center gap-2 text-xs sm:text-sm'
+      className='pointer-events-auto ml-auto flex items-center text-xs sm:text-sm'
     >
       {LOCALES.map((locale) =>
         locale === i18n.locale ? (
           <span
             key={locale}
             aria-current='page'
-            className='text-ink font-medium'
+            className='text-ink flex min-h-11 items-center rounded-lg px-3 font-medium'
             lang={LOCALE_TAGS[locale]}
           >
             {LOCALE_LABELS[locale]}
@@ -41,8 +42,8 @@ export default function LanguageSwitcher() {
         ) : (
           <a
             key={locale}
-            className='text-ink-subtle hover:text-ink underline-offset-4 hover:underline'
-            href={localePath(locale)}
+            className='text-ink-subtle hover:text-ink flex min-h-11 items-center rounded-lg px-3 underline-offset-4 hover:underline'
+            href={publicPath(localePath(locale))}
             hrefLang={LOCALE_TAGS[locale]}
             lang={LOCALE_TAGS[locale]}
             rel='alternate'

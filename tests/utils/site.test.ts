@@ -33,4 +33,12 @@ describe('Site', () => {
     expect(absoluteUrl('/fr')).toBe('https://example.com/fr');
     expect(absoluteUrl('og-image.png')).toBe('https://example.com/og-image.png');
   });
+
+  it('should expose consistent public and route paths below a mount point', async () => {
+    const { SITE_BASE_PATH, publicPath, routePath } = await loadSite({ VITE_SITE_URL: 'https://example.com/app' });
+
+    expect(SITE_BASE_PATH).toBe('/app');
+    expect(publicPath('/icons/favicon.svg')).toBe('/app/icons/favicon.svg');
+    expect(routePath('/app/fr')).toBe('/fr');
+  });
 });

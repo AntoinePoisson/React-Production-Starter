@@ -2,6 +2,8 @@ import type { Messages } from '@lingui/core';
 import { useLingui } from '@lingui/react';
 import { useCallback, useEffect } from 'react';
 
+import { publicPath, routePath } from '@/utils/config/Site';
+
 import { DEFAULT_LOCALE, LOCALE_TAGS, type Locale, isLocale, localePath } from './Routing';
 
 /**
@@ -18,7 +20,7 @@ const CATALOGUES: Record<Locale, () => Promise<{ messages: Messages }>> = {
 };
 
 export const localeFromPath = (pathname: string): Locale => {
-  const segment = pathname.split('/')[1];
+  const segment = routePath(pathname).split('/')[1];
 
   return isLocale(segment) ? segment : DEFAULT_LOCALE;
 };
@@ -56,14 +58,14 @@ export const useLocaleSwitch = () => {
       } catch {
         // Catalogue never arrived (offline tab, chunk lost to a deploy). Fall back to what the
         // anchor would have done on its own.
-        window.location.assign(localePath(locale));
+        window.location.assign(publicPath(localePath(locale)));
 
         return;
       }
 
       // After the swap, so a failed switch never leaves the URL claiming a language the page is
       // not in. pushState so the previous locale stays reachable with the back button.
-      window.history.pushState(null, '', localePath(locale));
+      window.history.pushState(null, '', publicPath(localePath(locale)));
     },
     [apply]
   );

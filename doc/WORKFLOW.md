@@ -186,7 +186,7 @@ Keep the deploy step exiting non-zero on failure, that is what stops the release
 ## Versioning
 
 Release-Please, with one manifest and one config per branch:
-`.release-please-manifest-preprod.json` / `.release-please-config-preprod.json` (main, prerelease)
+`config/release-please/manifest-preprod.json` / `config/release-please/config-preprod.json` (main, prerelease)
 and the `-prod` equivalents (prod, stable). Two config files, not one shared, because `prerelease`
 and `versioning` live in the config file since release-please-action v5 — they used to be action
 inputs, and a shared config can't give preprod and prod different prerelease behaviour.
@@ -230,7 +230,7 @@ node initialize.js
 ```
 
 It rewrites `package.json`, the docs, `.env.example`, `manifest.json`, `humans.txt`,
-`Identity.ts` and the storage namespaces; resets the version to `0.0.0` and empties the
+`icons/favicon.svg`, `Identity.ts` and the storage namespaces; resets the version to `0.0.0` and empties the
 changelog; and offers to drop the 3D demo and reinitialise git.
 
 Then check what it could not know:
@@ -242,15 +242,20 @@ Then check what it could not know:
 
 ### 2. Artwork
 
-Every raster asset is generated from one vector source:
+Every raster asset is generated from `public/icons/favicon.svg`, which is also the icon the
+browser tab loads:
 
 ```bash
-# Edit MARK and COLORS at the top of the script, then:
+# Replace the `.fg` path in public/icons/favicon.svg, then:
 pnpm assets:brand
 ```
 
 That regenerates the favicon, the apple touch icon, both `any` sizes, both `maskable` sizes and
 the 1200x630 OG image. Check any replacement against <https://maskable.app>.
+
+The OG image is the icon and the project name on a flat ground, nothing else. The description
+crawlers show beside it comes from `og:description`, so a second copy inside the image would only
+go stale.
 
 ### 3. Git & GitHub
 

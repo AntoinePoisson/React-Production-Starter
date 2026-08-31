@@ -47,7 +47,7 @@ Throttled mobile: FCP 1.2 s · LCP 2.0 s · TBT 50 ms · CLS 0.
   scene are another ~210 kB that download _after_ the copy is on screen, never in front of it.
 - **100 % coverage** on statements, branches, functions and lines — enforced, not reported:
   `pnpm test` fails below it.
-- **395 unit tests** and **34 E2E scenarios** across five browser projects, covering Core Web
+- **424 unit tests** and **35 E2E scenarios** across five browser projects, covering Core Web
   Vitals, FPS and memory, WebGL init and context loss, responsive behaviour and locale switching.
 - **Budgets in CI**: 600 kB JS, 6 kB CSS, 8 kB HTML, measured brotlied on `dist/client/`.
 
@@ -113,7 +113,15 @@ src/
 ├── scene/         What is on stage — demo/ is placeholder
 ├── i18n/          Locales, catalogues, in-place locale switching
 └── utils/         logger · screen · store · theme · vitals · config
+
+config/            Config files no tool discovers on its own
+├── release-please/  One config and one manifest per release branch
+└── serve.json       Static-server rules for `pnpm website`
 ```
+
+Everything else stays at the root, where its own tool and the editor look for it: `eslint.config.mjs`,
+`vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `lingui.config.ts`, `tsconfig.json`,
+`lefthook.yml`. Prettier, knip, size-limit and commitlint live in `package.json`.
 
 ## Things worth knowing
 
@@ -166,7 +174,10 @@ Actions"**. Left on "Deploy from a branch", Pages renders `README.md` instead, s
 Publish `dist/client/`. Keep deploy before release, so no tag points at undeployed code.
 `develop` and `main` deploy even if tests fail; `prod` does not.
 
-Set `VITE_SITE_URL` as a repository variable, or every page ships a localhost canonical.
+Set `VITE_SITE_URL` as a repository variable for a custom domain. Without one, CI derives the
+GitHub Pages project URL (`https://<owner>.github.io/<repository>`) and preserves its base path in
+routes, assets, canonical links, the sitemap and the service worker. The deployment job then
+smoke-tests both locales, referenced assets, SEO files and the static 404.
 
 ## Licence
 

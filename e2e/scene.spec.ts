@@ -1,8 +1,8 @@
-import { expect, test } from './fixtures/webVitalsFixture';
+import { appPath, expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, isMobile, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// hydration/Hydration do silence a genuine bug under vite dev. Kept anyway, for now.
+// Hydration messages are not noise: they indicate that the prerender and client disagree.
 const IGNORED_ERROR_PATTERNS = [
   // Dev tooling
   'DevTools',
@@ -10,8 +10,6 @@ const IGNORED_ERROR_PATTERNS = [
   'favicon',
   'next-dev-overlay',
   'next/dist',
-  'hydration',
-  'Hydration',
   'webpack',
   'hot-reloader',
   // WebGL/three.js runtime errors, expected in CI with software renderers
@@ -39,7 +37,7 @@ test.describe('3D Scene', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('should load and render the 3D scene', async ({ pageWithVitals }, testInfo) => {
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
 
     const sceneLoaded = await waitForR3FScene(pageWithVitals, 30000);
     if (!sceneLoaded) {
@@ -71,7 +69,7 @@ test.describe('3D Scene', () => {
       consoleErrors.push(error.message);
     });
 
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const sceneReady = await waitForR3FScene(pageWithVitals, 30000);
     if (!sceneReady) {
       if (requiresWorkingWebGL(testInfo)) throw new Error(SCENE_BOOT_FAILURE);
@@ -244,7 +242,7 @@ test.describe('3D Scene', () => {
   test('should handle WebGL context loss and recovery', async ({ pageWithVitals }, testInfo) => {
     test.skip(isMobile(testInfo), 'Desktop only - context loss edge case');
 
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const sceneReady = await waitForR3FScene(pageWithVitals, 15000);
     if (!sceneReady) {
       if (requiresWorkingWebGL(testInfo)) throw new Error(SCENE_BOOT_FAILURE);

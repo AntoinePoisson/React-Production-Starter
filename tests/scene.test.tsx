@@ -1,11 +1,21 @@
 // Three.js does not run under jsdom: these verify composition. Pixels belong in the Playwright suite.
 
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { invalidate, sceneCanvas } = vi.hoisted(() => ({
+  invalidate: vi.fn(),
+  sceneCanvas: document.createElement('canvas')
+}));
 
 vi.mock('@react-three/fiber', () => ({
   useFrame: vi.fn(),
-  useThree: vi.fn(() => ({ camera: {}, scene: {}, gl: {} })),
+  useThree: vi.fn(() => ({
+    camera: {},
+    scene: {},
+    gl: { domElement: sceneCanvas },
+    invalidate
+  })),
   extend: vi.fn()
 }));
 
@@ -14,6 +24,7 @@ vi.mock('@react-three/drei', () => ({
     <div
       data-autorotate={String(props.autoRotate ?? false)}
       data-enablepan={String(props.enablePan ?? true)}
+      data-hasonstart={String(props.onStart !== undefined)}
       data-maxdistance={String(props.maxDistance ?? '')}
       data-mindistance={String(props.minDistance ?? '')}
       data-testid='orbit-controls'
@@ -105,8 +116,10 @@ describe('Experiences', () => {
   const originalMatchMedia = window.matchMedia;
 
   afterEach(() => {
+    vi.useRealTimers();
     window.matchMedia = originalMatchMedia;
     resetReducedMotionCache();
+    invalidate.mockClear();
   });
 
   it('should mount the whole demo scene without throwing', () => {
@@ -135,5 +148,20 @@ describe('Experiences', () => {
     const { getByTestId } = render(<Experiences />);
 
     expect(getByTestId('orbit-controls').dataset.autorotate).toBe('false');
+  });
+
+  it('should never hand the camera back frozen', () => {
+    // The drift is the idle state of the stage, not a one-shot introduction. Nothing subscribes
+    // to onStart and no timer switches autoRotate off: the only thing that stops it is
+    // prefers-reduced-motion, asserted above.
+    vi.useFakeTimers();
+    stubReducedMotion(false);
+    const { getByTestId } = render(<Experiences />);
+
+    expect(getByTestId('orbit-controls').dataset.hasonstart).toBe('false');
+
+    act(() => vi.advanceTimersByTime(120_000));
+
+    expect(getByTestId('orbit-controls').dataset.autorotate).toBe('true');
   });
 });

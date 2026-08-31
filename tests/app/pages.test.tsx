@@ -69,6 +69,12 @@ describe('NotFound', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', '/');
   });
 
+  it('should keep the error page out of search results', () => {
+    render(withI18n(<NotFound />));
+
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
+  });
+
   it('should translate its copy', () => {
     render(withI18n(<NotFound />, 'fr'));
 

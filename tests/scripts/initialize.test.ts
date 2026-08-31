@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { TEMPLATE, applyReplacements, buildReplacements, toOrigin, toSlug, toTitle } from '../../initialize.js';
+import {
+  TEMPLATE,
+  applyReplacements,
+  buildReplacements,
+  toOrigin,
+  toSiteUrl,
+  toSlug,
+  toTitle
+} from '../../initialize.js';
 
 /**
  * The rename rules are exported so they can be asserted without a temp directory. A rename that
@@ -34,20 +42,25 @@ describe('toTitle', () => {
   });
 });
 
-describe('toOrigin', () => {
+describe('toSiteUrl', () => {
   it.each([
     ['https://example.com', 'https://example.com'],
     ['https://example.com/', 'https://example.com'],
-    ['https://example.com/some/path', 'https://example.com'],
+    ['https://example.com/some/path/', 'https://example.com/some/path'],
+    ['https://example.com/app?preview=true#hero', 'https://example.com/app'],
     ['example.com', 'https://example.com']
-  ])('should reduce %j to %j', (input, expected) => {
-    expect(toOrigin(input)).toBe(expected);
+  ])('should normalise %j to %j', (input, expected) => {
+    expect(toSiteUrl(input)).toBe(expected);
   });
 
   it.each(['', 'not a url', '://'])('should return an empty string for %j', (input) => {
     // An empty origin means "not decided yet", and the SEO files already fail closed on one.
     // Throwing here would abort the whole rename over an optional field.
-    expect(toOrigin(input)).toBe('');
+    expect(toSiteUrl(input)).toBe('');
+  });
+
+  it('should retain the old helper as a compatibility alias', () => {
+    expect(toOrigin('example.com/app')).toBe('https://example.com/app');
   });
 });
 

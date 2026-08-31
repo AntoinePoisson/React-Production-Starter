@@ -58,16 +58,23 @@ export const toTitle = (name) =>
     .map((word) => (word === word.toLowerCase() ? word.charAt(0).toUpperCase() + word.slice(1) : word))
     .join(' ');
 
-/** Reduced to its origin. Empty for anything unparseable, which is a valid "not decided yet". */
-export const toOrigin = (url) => {
+/** Normalised site URL, including an optional deployment path. */
+export const toSiteUrl = (url) => {
   if (!url) return '';
 
   try {
-    return new URL(url.includes('://') ? url : `https://${url}`).origin;
+    const parsed = new URL(url.includes('://') ? url : `https://${url}`);
+    parsed.search = '';
+    parsed.hash = '';
+
+    return parsed.href.replace(/\/+$/, '');
   } catch {
     return '';
   }
 };
+
+// Kept for templates or integrations that imported the former helper.
+export const toOrigin = toSiteUrl;
 
 /**
  * Longest first. Replacing the slug before the title leaves a half-rewritten string that no
@@ -106,11 +113,14 @@ const REWRITE_FILES = [
   '.env.example',
   'public/manifest.json',
   'public/humans.txt',
+  'public/icons/favicon.svg',
   'src/utils/config/Identity.ts',
   'src/utils/store/SessionStorage.ts',
   'src/utils/logger/Logger.ts',
   'src/app/Metadata.ts',
   'src/app/pages/NotFound.tsx',
+  'src/components/ui/Overlay.tsx',
+  'scripts/generate-brand-assets.mjs',
   'scripts/postbuild.mjs',
   'vitest.config.ts',
   'src/i18n/messages/en.json',
@@ -184,14 +194,14 @@ async function main() {
   const description = flags.description ?? (await ask('Description', TEMPLATE.description));
   const author = flags.author ?? (await ask('Author', TEMPLATE.author));
   const rawUrl = flags.url ?? (await ask('Production URL', ''));
-  const origin = toOrigin(rawUrl);
+  const siteUrl = toSiteUrl(rawUrl);
   const namespace = await ask('Storage namespace', TEMPLATE.namespace);
 
   const dropDemo = await confirm('Remove the 3D demo scene (model, Draco decoder, floating shapes)?', false);
   const resetGit = await confirm('Reset git history and create the develop / main / prod branches?', false);
 
-  if (rawUrl && !origin) {
-    console.warn(`${colors.yellow}⚠ "${rawUrl}" is not a valid URL, leaving the origin unset.${colors.reset}`);
+  if (rawUrl && !siteUrl) {
+    console.warn(`${colors.yellow}⚠ "${rawUrl}" is not a valid URL, leaving the site URL unset.${colors.reset}`);
   }
 
   const answers = { title, slug, description, author, namespace };
@@ -219,10 +229,10 @@ async function main() {
     console.info(`  ${colors.green}✓${colors.reset} ${relativePath}`);
   }
 
-  if (origin) {
+  if (siteUrl) {
     const envExample = read('.env.example');
     if (envExample) {
-      write('.env.example', envExample.replace(/^VITE_SITE_URL=.*$/m, `VITE_SITE_URL=${origin}`), flags.dryRun);
+      write('.env.example', envExample.replace(/^VITE_SITE_URL=.*$/m, `VITE_SITE_URL=${siteUrl}`), flags.dryRun);
       console.info(`  ${colors.green}✓${colors.reset} .env.example ${colors.dim}(VITE_SITE_URL)${colors.reset}`);
     }
 
@@ -245,7 +255,7 @@ async function main() {
     write('package.json', packageJson.replace(/"version":\s*"[^"]*"/, '"version": "0.0.0"'), flags.dryRun);
   }
 
-  for (const manifest of ['.release-please-manifest-preprod.json', '.release-please-manifest-prod.json']) {
+  for (const manifest of ['config/release-please/manifest-preprod.json', 'config/release-please/manifest-prod.json']) {
     if (read(manifest) !== null) write(manifest, '{ ".": "0.0.0" }\n', flags.dryRun);
   }
 

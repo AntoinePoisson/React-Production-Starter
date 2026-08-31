@@ -1,17 +1,15 @@
-import { expect, test } from './fixtures/webVitalsFixture';
+import { appPath, expect, test } from './fixtures/webVitalsFixture';
 import { SCENE_BOOT_FAILURE, requiresWorkingWebGL } from './utils/testHelpers';
 import { waitForR3FScene } from './utils/webVitals';
 
-// Browser and dev-server noise. hydration/Hydration are NOT noise: React's dev build reports
-// real mismatches under that wording. Drop them once the suite is quiet enough locally.
+// Browser and dev-server noise. Hydration messages are intentionally not ignored: a mismatch is
+// a broken prerender, even when React manages to replace it on the client.
 const IGNORED_ERROR_PATTERNS = [
   'DevTools',
   'Extension',
   'favicon',
   'next-dev-overlay',
   'next/dist',
-  'hydration',
-  'Hydration',
   'webpack',
   'hot-reloader'
 ];
@@ -28,7 +26,7 @@ test.describe('Application Smoke Tests', () => {
   test.describe.configure({ mode: 'parallel' });
 
   test('should load the main page successfully', async ({ pageWithVitals }) => {
-    const response = await pageWithVitals.goto('/');
+    const response = await pageWithVitals.goto(appPath('/'));
 
     expect(response?.status()).toBe(200);
     await expect(pageWithVitals).toHaveTitle(/React App Fondation/i);
@@ -47,7 +45,7 @@ test.describe('Application Smoke Tests', () => {
       consoleErrors.push(error.message);
     });
 
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     const sceneLoaded = await waitForR3FScene(pageWithVitals);
     await pageWithVitals.waitForTimeout(2000);
 
@@ -70,15 +68,17 @@ test.describe('Application Smoke Tests', () => {
   test('should show the 404 page over the canvas rather than below it', async ({ pageWithVitals }) => {
     // No status assertion: `serve` answers an unknown path with 404.html and a 404, the dev
     // server renders the same component with a 200. What both owe is a readable page.
-    await pageWithVitals.goto('/this-route-does-not-exist');
+    const response = await pageWithVitals.goto(appPath('/this-route-does-not-exist'));
 
     // The canvas is what made this fail: R3F's wrapper is a full-height block, so a system page
     // left in normal flow rendered below the fold of a body that cannot scroll. Present in the
     // DOM, impossible to reach — which is why toBeVisible() alone would not have caught it.
-    await waitForR3FScene(pageWithVitals);
+    if (response?.status() === 200) await waitForR3FScene(pageWithVitals);
+    else await expect(pageWithVitals.locator('canvas')).toHaveCount(0);
 
     await expect(pageWithVitals.getByRole('heading', { level: 1 })).toBeInViewport();
     await expect(pageWithVitals.getByRole('link')).toBeInViewport();
+    await expect(pageWithVitals.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
   });
 
   test('should load all essential assets without failures', async ({ pageWithVitals }) => {
@@ -88,7 +88,7 @@ test.describe('Application Smoke Tests', () => {
       failedRequests.push(request.url());
     });
 
-    await pageWithVitals.goto('/');
+    await pageWithVitals.goto(appPath('/'));
     await waitForR3FScene(pageWithVitals);
 
     const criticalFails = failedRequests.filter(
