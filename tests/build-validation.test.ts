@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -164,6 +164,27 @@ describe('Web app manifest', () => {
     for (const icon of manifest.icons as { src: string }[]) {
       expect(existsSync(join(PROJECT_ROOT, 'public', icon.src)), `${icon.src} is declared but missing`).toBe(true);
     }
+  });
+});
+
+describe('Brand icons', () => {
+  const svgFiles = readdirSync(join(PROJECT_ROOT, 'public'), { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith('.svg'));
+
+  it('should find the vector source the raster icons are generated from', () => {
+    expect(svgFiles).toContain(join('icons', 'favicon.svg'));
+  });
+
+  it.each(svgFiles)('should parse %s as strict XML', (name) => {
+    // A favicon is fetched as an image, and an image is parsed as XML, not as HTML: one malformed
+    // comment and the browser drops the whole file. It fails silently -- no console message, no
+    // fallback to the PNG sibling, just an empty tab icon -- and every other check still passes,
+    // because generate-brand-assets.mjs reads the mark with a regex and the file serves fine.
+    const document = new DOMParser().parseFromString(read(join('public', name)), 'image/svg+xml');
+    const error = document.querySelector('parsererror');
+
+    expect(error?.textContent ?? '').toBe('');
   });
 });
 

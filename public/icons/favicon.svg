@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="React App Fondation">
   <!-- The one vector source. `pnpm assets:brand` reads the .fg path out of this file to build
        every raster icon and the OG image, so keep the class and the square viewBox.
-       Colours mirror --color-accent / --color-ink in app/globals.css. -->
+       Colours mirror the color-accent / color-ink theme variables in app/globals.css.
+       Keep this comment free of double hyphens. A favicon is parsed as strict XML, where a
+       double hyphen inside a comment is a fatal error, and the icon then fails to load at
+       all: no console message, just no icon in the tab. -->
   <style>
     .bg { fill: #0f172a }
     .fg { fill: #6b8cfa }
