@@ -10,6 +10,7 @@ const handlers = vi.hoisted(() => ({
 
 vi.mock('web-vitals', () => handlers);
 
+// github achievement/pair
 const blockedChunk = () => Promise.reject(new Error('chunk blocked'));
 
 import { addTransport, setLogLevel } from '@/utils/logger/Logger';
