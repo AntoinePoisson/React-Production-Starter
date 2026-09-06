@@ -10,14 +10,8 @@ const handlers = vi.hoisted(() => ({
 
 vi.mock('web-vitals', () => handlers);
 
-// Make the import itself fail. doMock, not a flag — mocked modules stay cached
-// and resetModules() doesn't re-run the factory.
-const blockTheChunk = () =>
-  vi.doMock('web-vitals', () => {
-    throw new Error('chunk blocked');
-  });
-
-const restoreTheChunk = () => vi.doMock('web-vitals', () => handlers);
+// github achievement/pair
+const blockedChunk = () => Promise.reject(new Error('chunk blocked'));
 
 import { addTransport, setLogLevel } from '@/utils/logger/Logger';
 import { rateVital, reportVital, resetVitalsReporting, startVitalsReporting } from '@/utils/vitals/WebVitals';
@@ -107,7 +101,6 @@ describe('startVitalsReporting', () => {
 
   afterEach(() => {
     resetVitalsReporting();
-    restoreTheChunk();
   });
 
   it('should subscribe to every Core Web Vital', async () => {
@@ -144,19 +137,16 @@ describe('startVitalsReporting', () => {
   });
 
   it('should survive the library failing to load', async () => {
-    blockTheChunk();
-
-    // Measurement is optional; a blocked chunk must never propagate.
-    await expect(startVitalsReporting()).resolves.toBeUndefined();
+    // Don't doMock the module: a previous test already imported it, and that
+    // cache wins. Pass a rejecting loader instead.
+    await expect(startVitalsReporting(blockedChunk)).resolves.toBeUndefined();
     expect(handlers.onLCP).not.toHaveBeenCalled();
   });
 
   it('should allow a retry once the library loads again', async () => {
-    blockTheChunk();
-    await startVitalsReporting();
+    await startVitalsReporting(blockedChunk);
 
     // Nothing was subscribed, so re-arming the guard is safe.
-    restoreTheChunk();
     await startVitalsReporting();
     expect(handlers.onLCP).toHaveBeenCalledOnce();
   });
