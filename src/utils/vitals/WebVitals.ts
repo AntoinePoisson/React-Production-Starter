@@ -41,15 +41,19 @@ export const reportVital = ({ name, value, rating }: VitalReport): void => {
 
 let started = false;
 
-export const startVitalsReporting = async (): Promise<void> => {
+type VitalsLibrary = typeof import('web-vitals');
+
+export const startVitalsReporting = async (
+  loadLibrary: () => Promise<VitalsLibrary> = () => import('web-vitals')
+): Promise<void> => {
   if (started || typeof window === 'undefined') return;
   started = true;
 
   // Split from the subscribe try so the two catch blocks mean different things.
-  let library: typeof import('web-vitals');
+  let library: VitalsLibrary;
 
   try {
-    library = await import('web-vitals');
+    library = await loadLibrary();
   } catch (error) {
     // Nothing subscribed yet, so we can retry.
     started = false;
